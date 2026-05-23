@@ -1,12 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, Depends
 import shutil
 import os
+from loguru import logger
 
 from sqlalchemy.orm import Session
 from src.core.database import SessionLocal
 from src.services.pdf_parser import extract_content
 from src.services.document_service import create_document, get_all_documents
 from src.schemas.document import DocumentResponse
+from src.services.chunking import create_chunks
 
 router = APIRouter(
     prefix="/api/vi/documents",
@@ -40,6 +42,10 @@ def upload_document(file:UploadFile = File(...), db:Session = Depends(get_db)):
     
     # Extract text
     content = extract_content(file_path)
+    
+    # Create chunks
+    chunks = create_chunks(content)
+    logger.info(chunks)
     
     # Store in db
     doc = create_document(db, title=file.filename, content=content)
