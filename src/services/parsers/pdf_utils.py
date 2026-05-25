@@ -115,7 +115,7 @@ def clean_text(text: str) -> str:
 
     Order matters!
     """
-    text = remove_table_noise(text)
+    # text = remove_table_noise(text)
     text = fix_hyphenation(text)
     text = normalize_newlines(text)
     text = remove_noise(text)

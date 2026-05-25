@@ -5,10 +5,10 @@ from loguru import logger
 
 from sqlalchemy.orm import Session
 from src.core.database import SessionLocal
-from src.services.pdf_parser import extract_content
+from src.services.ingestion.parsing_pipeline import extract_content
 from src.services.document_service import create_document, get_all_documents
 from src.schemas.document import DocumentResponse
-from src.services.chunking import create_chunks
+from src.services.ingestion.chunking import create_chunks
 
 router = APIRouter(
     prefix="/api/vi/documents",
@@ -45,7 +45,8 @@ def upload_document(file:UploadFile = File(...), db:Session = Depends(get_db)):
     
     # Create chunks
     chunks = create_chunks(content)
-    logger.info(chunks)
+    logger.info(f"number of chunks: {len(chunks)}")
+    logger.info(f"chunck: {chunks}")
     
     # Store in db
     doc = create_document(db, title=file.filename, content=content)

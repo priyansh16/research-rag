@@ -1,16 +1,7 @@
-from src.services.pdf_utils import extract_text, extract_tables, format_tables, clean_text
+from src.services.parsers.pdf_utils import extract_text, extract_tables, format_tables, clean_text
 
 
-def extract_content(file_path:str) -> str:
-    """
-    Abstract extraction layer.
-    Switch beetwen extraction logic:
-    - PyMuPDF (current)
-    - Unstructured(future)
-    """
-    return process_pdf(file_path)
-
-def process_pdf(file_path: str) -> str:
+def extract_with_fitz(file_path: str) -> str:
     """
     Inital extraction pipeline using pdfplumber and fitz.
 
@@ -19,8 +10,8 @@ def process_pdf(file_path: str) -> str:
     - table extraction
     - cleaning
     - merging
-
-    Directly called by API.
+    
+    can be called by pipeline.
     """
 
     raw_text = extract_text(file_path)
