@@ -1,8 +1,0 @@
-fastapi==0.136.1
-uvicorn==0.47.0
-python-dotenv==1.2.2
-pydantic==2.13.4
-httpx==0.28.1
-loguru==0.7.3
-python-multipart==0.0.29
-pdfplumber==0.11.9

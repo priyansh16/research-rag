@@ -206,3 +206,27 @@ PDF → semantic document elements → intelligent chunking
 - PDFs are significantly harder to process than plain text documents
 
 ---
+
+## Unstructured for document parcing
+- extraction quality defines RAG quality
+- semantic parsing > regex cleanup
+- unstructured preserves layout-aware document elements
+- hi_res parsing uses OCR/layout analysis
+- tables require document-aware parsing, not heuristics
+- flattening documents destroys semantic structure
+- semantic chunking depends on semantic extraction
+- production RAG starts with document intelligence
+- dependency isolation exposed hidden package coupling
+- pyproject.toml + uv.lock improves reproducibility
+
+- semantic extraction enables semantic chunking
+- section-aware chunks improve retrieval quality
+- chunking should preserve meaning, not token counts
+- hi_res parsing improves layout understanding
+- metadata-aware chunks are critical for production RAG
+- document structure is retrieval signal
+
+# Final chunking Pipeline
+- Never overlap with hard codded characters, it may break sentances, or words in mid way. 
+- overlap corruption
+
