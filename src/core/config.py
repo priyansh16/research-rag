@@ -24,6 +24,15 @@ class Settings:
     OVERLAP_ELEMENTS: int = int(
         os.getenv("OVERLAP_ELEMENTS", 2)
     )
+    
+    EMBEDDING_MODEL: str= os.getenv(
+        "EMBEDDING_MODEL", 
+        "BAAI/bge-small-en-v1.5"
+    )
+    
+    TOP_K_RESULTS:int = int(os.getenv(
+        "TOP_K_RESULTS", 3
+    ))
 
 settings = Settings()
     
