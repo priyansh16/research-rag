@@ -5,7 +5,7 @@ from src.services.parsers.unstructured_parser import (
     elements_to_text
 )
 
-from src.services.ingestion.chunking import (
+from services.chunking import (
     create_chunks
 )
 

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, DateTime
 from src.core.database import Base
+from datetime import datetime
 
 class Document(Base):
     """
@@ -10,5 +11,14 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    content = Column(Text)
+    
+    title = Column(String, nullable=False)
+    
+    parser = Column(String)
+    
+    embedding_model = Column(String)
+    
+    chunk_count = Column(Integer)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+

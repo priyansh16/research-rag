@@ -1,4 +1,4 @@
-from src.services.embeddings.retrieval_service import RetrievalService
+from services.retrieval.retrieval_service import RetrievalService
 
 def test_semantic_retrieval_ml( embedded_chunks):
 

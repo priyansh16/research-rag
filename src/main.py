@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from loguru import logger
 from src.core.database import Base, engine
 
-from src.routers import health, documents
+from src.routers import health, documents, retrieval
 
 # def lifespan(app: FastAPI):
 #     logger.info("Starting RAG API....")
@@ -14,7 +14,10 @@ app = FastAPI(
 
 #Include routers
 app.include_router(health.router)
+
 app.include_router(documents.router)
+
+app.include_router(retrieval.router)
 
 @app.on_event("startup")
 def startup_event():
