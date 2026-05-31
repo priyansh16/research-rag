@@ -33,6 +33,14 @@ class Settings:
     TOP_K_RESULTS:int = int(os.getenv(
         "TOP_K_RESULTS", 3
     ))
+    
+    CHROMA_COLLECTION_NAME: str = os.getenv(
+        "CHROMA_COLLECTION_NAME"
+        ,"research_documents")
+    
+    CHROMA_DB_DIR:str = os.getenv(
+        "CHROMA_DB_DIR", 
+        "./chroma_db")
 
 settings = Settings()
     
