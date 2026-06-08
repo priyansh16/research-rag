@@ -7,7 +7,7 @@ from src.services.parsers.parsing_pipeline import extract_content
 from src.services.chunking import create_chunks
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.vectorstore.chroma_service import ChromaService
-from src.services.document_service import create_document
+from src.services.document_service import DocumentService
 
 from src.core.config import settings
 
@@ -59,8 +59,8 @@ class IngestionService:
             )
         
          # Step 4 - Store document metadata in SQL
-        document = create_document(
-            db=db,
+        doc_service = DocumentService(db)
+        document = doc_service.create_document(
             title=document_name,
             parser=settings.PARSER_BACKEND,
             embedding_model=settings.EMBEDDING_MODEL,
@@ -78,9 +78,7 @@ class IngestionService:
                     "document_name": document_name,
                     "chunk_index": i,
                     "parser": settings.PARSER_BACKEND,
-                    "embedding_model": (
-                       settings.EMBEDDING_MODEL,
-                    ),
+                    "embedding_model": settings.EMBEDDING_MODEL,
                 }
             )
         
