@@ -6,7 +6,8 @@
 ![Pytest](https://img.shields.io/badge/Pytest-8.0%2B-blue)
 
 > **Retrieval layer: complete and working**  
-> **Generation layer: in progress**
+> **Generation layer: complete and working**
+> **Evaluation layer: In progress**
 ---
 ## Description
 An end-to-end document ingestion, retrieval, and observability system built for serving high-quality context to AI agents and LLM pipelines.
