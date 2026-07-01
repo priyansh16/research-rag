@@ -7,7 +7,8 @@ from src.core.config import settings
 from src.core.database import init_db
 from src.core.logging import setup_logging
 from src.core.middleware import LoggingMiddleware
-from src.routers import health, documents, retrieval
+from src.routers import health, documents, retrieval, generation
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +35,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(health.router)
 app.include_router(documents.router)
 app.include_router(retrieval.router)
+app.include_router(generation.router)
     
     
 @app.get("/")

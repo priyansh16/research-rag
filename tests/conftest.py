@@ -5,12 +5,16 @@ from src.services.parsers.unstructured_parser import (
     elements_to_text
 )
 
-from services.chunking import (
+from src.services.chunking import (
     create_chunks
 )
 
 from src.services.embeddings.embedding_service import (
     EmbeddingService
+)
+
+from src.services.guardrails.guardrails_service import (
+    GuardrailsService
 )
 
 
@@ -71,3 +75,7 @@ def embedded_chunks(
         )
 
     return records
+
+@pytest.fixture(scope="session")
+def guardrails():
+    return GuardrailsService()
