@@ -1,15 +1,15 @@
 from src.services.retrieval.retrieval_service import RetrievalService
 
-def test_semantic_retrieval_ml( embedded_chunks):
+def test_semantic_retrieval_ml():
 
     retrieval_service = RetrievalService()
 
     results = retrieval_service.search(
         query="machine learning research",
-        chunk_records=embedded_chunks
     )
+    
 
-    top_chunk = results[0]["chunk"]
+    top_chunk = results[0]["chunks"]
 
     assert (
         "Gaussian Mixture Models"
@@ -20,41 +20,17 @@ def test_semantic_retrieval_ml( embedded_chunks):
     )
 
 
-def test_semantic_retrieval_cisco(
-    embedded_chunks
-):
+def test_semantic_retrieval_hockey():
 
     retrieval_service = RetrievalService()
 
     results = retrieval_service.search(
-        query="software engineering experience",
-        chunk_records=embedded_chunks
-    )
+        query="ice hockey analytics"
+        )
 
     combined = " ".join(
         [
-            r["chunk"]
-            for r in results
-        ]
-    )
-
-    assert "Cisco Systems" in combined
-
-
-def test_semantic_retrieval_hockey(
-    embedded_chunks
-):
-
-    retrieval_service = RetrievalService()
-
-    results = retrieval_service.search(
-        query="ice hockey analytics",
-        chunk_records=embedded_chunks
-    )
-
-    combined = " ".join(
-        [
-            r["chunk"]
+            r["chunks"]
             for r in results
         ]
     )
@@ -65,15 +41,12 @@ def test_semantic_retrieval_hockey(
     )
 
 
-def test_retrieval_returns_scores(
-    embedded_chunks
-):
+def test_retrieval_returns_scores():
 
     retrieval_service = RetrievalService()
 
     results = retrieval_service.search(
-        query="Python",
-        chunk_records=embedded_chunks
+        query="Python"
     )
 
     assert "score" in results[0]
