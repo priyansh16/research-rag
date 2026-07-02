@@ -6,8 +6,8 @@
 ![Pytest](https://img.shields.io/badge/Pytest-8.0%2B-blue)
 
 > **Retrieval layer: complete and working**  
-> **Generation layer: complete and working (local Ollama)**
-> **FastAPI dependency injection: in progress**
+> **Generation layer: complete and working (local Ollama)**  
+> **FastAPI dependency injection: in progress**  
 > **Evaluation layer: planned**
 
 ---
