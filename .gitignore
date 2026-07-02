@@ -1,4 +1,10 @@
+# Manual addition
+/chroma_db
+/data
 *.db
+/logs
+/.python-version
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

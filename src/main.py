@@ -9,18 +9,21 @@ from src.core.logging import setup_logging
 from src.core.middleware import LoggingMiddleware
 from src.routers import health, documents, retrieval, generation
 
+# Configure logging BEFORE creating the application
+setup_logging(debug=settings.DEBUG)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Startup: configure logging, initialise DB tables.
-    Shutdown: log teardown (extend here for connection pool cleanup, etc.)
-    """
-    setup_logging(debug=settings.DEBUG)
+    
     logger.info(f"Starting {settings.APP_NAME}")
+    
     init_db()
+    
+    logger.info("Database initialized")
+    
     yield
-    logger.info(f"Shutting down {settings.APP_NAME}")
+    
+    logger.info("Shutting down {}", settings.APP_NAME)
     
 # App
 app = FastAPI(

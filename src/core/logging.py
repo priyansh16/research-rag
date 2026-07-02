@@ -2,59 +2,115 @@ import sys
 import logging
 from loguru import logger
 
+LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+    "<level>{level:<8}</level> | "
+    "[<cyan>{extra[request_id]}</cyan>] | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+    "<level>{message}</level>"
+)
 
 def setup_logging(debug: bool = False) -> None:
     """
-    Configure loguru for structured, leveled output.
+    Configure Loguru for the application.
 
-    In production (debug=False): JSON-style, WARNING and above.
-    In development (debug=True): human-readable, DEBUG and above.
+    Console:
+        - INFO/DEBUG depending on DEBUG flag
 
-    Call once from main.py at startup.
+    logs/app.log:
+        - INFO+
+
+    logs/error.log:
+        - ERROR+
+
+    Also redirects stdlib logging (uvicorn, FastAPI, etc.)
+    into Loguru.
+    
     """
 
     logger.remove()
+    
+    # Default value for logs outside request context
+    logger.configure(extra={"request_id": "-"})
 
-    level = "DEBUG" if debug else "WARNING"
-
+    console_level = "DEBUG" if debug else "INFO"
+    
+    # -----------------------------
+    # Console
+    # -----------------------------
     logger.add(
         sys.stdout,
-        level=level,
-        format=(
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{line}</cyan> — "
-            "<level>{message}</level>"
-        ),
+        level=console_level,
+        format=LOG_FORMAT,
         colorize=True,
         backtrace=True,
         diagnose=debug,  
     )
 
-    # Also write WARNING+ to a file for persistence
+    # -----------------------------
+    # Application logs
+    # -----------------------------   
     logger.add(
         "logs/app.log",
-        level="WARNING",
+        level="INFO",
         rotation="10 MB",
         retention="7 days",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{line} — {message}",
+        compression="zip",
+        format=LOG_FORMAT,
         backtrace=True,
-        diagnose=False,  # prevent writing variable values to disk
+        diagnose=False,
     )
-
-    # Intercept stdlib logging (uvicorn, sqlalchemy, etc.) into loguru
-    class _InterceptHandler(logging.Handler):
+    
+    # -----------------------------
+    # Error logs
+    # -----------------------------
+    logger.add(
+        "logs/error.log",
+        level="ERROR",
+        rotation="10 MB",
+        retention="30 days",
+        compression="zip",
+        format=LOG_FORMAT,
+        backtrace=True,
+        diagnose=False,
+    )
+    
+    # -----------------------------
+    # Intercept stdlib logging
+    # -----------------------------
+    class InterceptHandler(logging.Handler):
         def emit(self, record: logging.LogRecord) -> None:
             try:
                 level = logger.level(record.levelname).name
             except ValueError:
                 level = record.levelno
+                
             frame, depth = logging.currentframe(), 2
-            while frame.f_code.co_filename == logging.__file__:
-                frame = frame.f_back  # type: ignore[assignment]
+            
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
                 depth += 1
-            logger.opt(depth=depth, exception=record.exc_info).log(
-                level, record.getMessage()
+            logger.opt(
+                depth=depth, 
+                exception=record.exc_info
+                ).log(level, record.getMessage()
             )
 
-    logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
+    logging.basicConfig(
+        handlers=[InterceptHandler()], 
+        level=0, 
+        force=True)
+    
+    # Redirect uvicorn loggers
+    for logger_name in (
+        "uvicorn",
+        "uvicorn.error",
+        "uvicorn.access",
+        "fastapi",
+    ):
+        uv_logger = logging.getLogger(logger_name)
+        uv_logger.handlers = [InterceptHandler()]
+        uv_logger.propagate = False
+
+    
+    
