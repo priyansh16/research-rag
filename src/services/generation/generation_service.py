@@ -61,10 +61,20 @@ class GenerationService:
     services need to be shared/mocked across more routes.
     """
 
-    def __init__(self) -> None:
-        self.guardrails_service = GuardrailsService()
-        self.retrieval_service = RetrievalService()
-        self.ollama_client = OllamaClient()
+    def __init__(
+        self,
+        retrieval_service: RetrievalService,
+        guardrails_service: GuardrailsService,
+        ollama_client: OllamaClient
+        ):
+        
+        self.guardrails_service = guardrails_service
+        self.retrieval_service = retrieval_service
+        self.ollama_client = ollama_client
+        
+        logger.info(
+            "GenerationService initialized with shared dependencies."
+        )
 
     async def generate(self, query: str) -> GenerationResult:
         total_start = time.perf_counter()
@@ -86,7 +96,10 @@ class GenerationService:
         retrieval_latency_ms = (time.perf_counter() - retrieval_start) * 1000
 
         if not chunks:
-            logger.info("No chunks retrieved for query; returning early.")
+            logger.warning(
+                "Generation skipped because retrieval returned no relevant chunks."
+                )            
+            
             total_latency_ms = (time.perf_counter() - total_start) * 1000
             return GenerationResult(
                 query=query,
@@ -120,11 +133,11 @@ class GenerationService:
         total_latency_ms = (time.perf_counter() - total_start) * 1000
 
         logger.info(
-            "Generation complete: retrieval={}ms generation={}ms total={}ms chunks={}",
-            round(retrieval_latency_ms, 2),
-            round(generation_latency_ms, 2),
-            round(total_latency_ms, 2),
+            "Generation completed | chunks={} | retrieval_latency_ms={:.2f} | generation_latency_ms={:.2f} | total_latency_ms={:.2f}",
             len(context_chunks),
+            retrieval_latency_ms,
+            generation_latency_ms,
+            total_latency_ms
         )
 
         return GenerationResult(

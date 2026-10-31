@@ -79,8 +79,13 @@ class EmbeddingService:
         Generate embedding text for single chunk.
         Retries up to 3 times on RuntimeError with exponential backoff (1s → 2s → 4s).
         """
-        
+        start = time.perf_counter()
         embedding = self.model.encode(text,normalize_embeddings=True)
+        latency_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Embedding generated | latency_ms={:.2f}",
+            latency_ms,
+        )
         return embedding.tolist()
     
     
@@ -96,6 +101,13 @@ class EmbeddingService:
         Generate embeddings for multiple chunks.
         Retries up to 3 times on RuntimeError with exponential backoff (1s → 2s → 4s).
         """
+        start = time.perf_counter()
         embeddings = self.model.encode(texts,normalize_embeddings=True)
+        latency_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Batch embeddings generated | chunks={} | latency_ms={:.2f}",
+            len(texts),
+            latency_ms,
+        )
         return embeddings.tolist()
         

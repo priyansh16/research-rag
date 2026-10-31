@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.services.document_service import DocumentService
 from src.schemas.document import DocumentResponse
-from src.services.ingestion.ingection_services import IngestionService
+from src.services.ingestion.ingestion_service import IngestionService
+from src.core.dependencies import get_ingestion_service, get_document_service
 
 
 router = APIRouter(
@@ -18,19 +19,12 @@ router = APIRouter(
 UPLOAD_DIR = "data"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Dependencies 
-def get_document_service(db: Session = Depends(get_db)) -> DocumentService:
-    """
-    Constructs DocumentService with the request-scoped DB session.
-    Injected into route handlers via FastAPI's dependency system.
-    """
-    return DocumentService(db)
 
 @router.post("/upload", response_model=DocumentResponse)
 def upload_document(
     file:UploadFile = File(...), 
     doc_service: DocumentService = Depends(get_document_service),
-    db:Session = Depends(get_db)
+    ingestion_service: IngestionService = Depends(get_ingestion_service),
     ):
     """
     Upload a PDF → run ingestion pipeline → store record in DB.
@@ -55,10 +49,8 @@ def upload_document(
     # IngestionService internally calls DocumentService.create_document
     # We pass db so it can use the same transaction scope.
     try:
-        ingestion_service = IngestionService()
-        
         document = ingestion_service.ingect_document(
-            db=db,
+            doc_service=doc_service,
             file_path=file_path,
             document_name=file.filename
         )

@@ -5,21 +5,12 @@ from loguru import logger
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.vectorstore.chroma_service import ChromaService
 from src.services.document_service import DocumentService
+from src.services.generation.ollama_client import OllamaClient
+from src.core.dependencies import get_embedding_service, get_chroma_service, get_ollama_client, get_document_service
 from src.core.database import get_db
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1", tags=["Health"])
-
-# ---------------------------------------------------------------------------
-# Dependency helpers — each instantiates the service fresh per request.
-# In a larger app we'd inject singletons via lifespan; for now, this is fine .
-# ---------------------------------------------------------------------------
-
-def get_embedding_service() -> EmbeddingService:
-    return EmbeddingService()
-
-def get_chroma_service() -> ChromaService:
-    return ChromaService()
 
 # Routes
 @router.get("/health")
@@ -36,9 +27,12 @@ def health_check():
 
 
 @router.get("/health/full")
-def full_health_check(
-    db: Session = Depends(get_db),
-):
+async def full_health_check(
+    doc_service: DocumentService = Depends(get_document_service),
+    chroma_service: ChromaService = Depends(get_chroma_service),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
+    ollama_client: OllamaClient = Depends(get_ollama_client)
+    ):
     """
     Full readiness probe — checks all downstream dependencies.
 
@@ -46,6 +40,7 @@ def full_health_check(
     - Vector DB (ChromaDB): collection reachable, document count
     - Embedding model: can encode a probe string, reports latency
     - Document store (SQLite): table reachable, document count
+    - Ollama model: model reachable, and its health
 
     Returns 200 if all dependencies are healthy.
     Returns 503 if any dependency is degraded.
@@ -56,11 +51,12 @@ def full_health_check(
 
     # Run all three checks — collect results even if one fails,
     # so the caller gets a complete picture of what's broken.
-    chroma_status = ChromaService().health()
-    embedding_status = EmbeddingService().health()
+    chroma_status = chroma_service.health()
+    embedding_status = embedding_service.health()
 
-    doc_service = DocumentService(db)
     doc_store_status = doc_service.health()
+    
+    ollama_client_status = await ollama_client.health_check()
 
     total_ms = (time.perf_counter() - start) * 1000
 
@@ -68,6 +64,7 @@ def full_health_check(
         "vector_db": chroma_status,
         "embedding_model": embedding_status,
         "document_store": doc_store_status,
+        "ollama_model": ollama_client_status,
     }
 
     # Overall status is degraded if ANY dependency is degraded

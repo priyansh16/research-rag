@@ -20,6 +20,9 @@ class DocumentService:
 
     def __init__(self, db: Session):
         self.db = db
+        logger.info(
+            "DocumentService initialized."
+        )
 
     # ------------------------------------------------------------------
     # Health

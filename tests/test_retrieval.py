@@ -1,13 +1,9 @@
-from src.services.retrieval.retrieval_service import RetrievalService
-
-def test_semantic_retrieval_ml():
-
-    retrieval_service = RetrievalService()
+def test_semantic_retrieval_ml(retrieval_service):
 
     results = retrieval_service.search(
         query="machine learning research",
     )
-    
+
 
     top_chunk = results[0]["chunks"]
 
@@ -20,9 +16,7 @@ def test_semantic_retrieval_ml():
     )
 
 
-def test_semantic_retrieval_hockey():
-
-    retrieval_service = RetrievalService()
+def test_semantic_retrieval_hockey(retrieval_service):
 
     results = retrieval_service.search(
         query="ice hockey analytics"
@@ -41,9 +35,7 @@ def test_semantic_retrieval_hockey():
     )
 
 
-def test_retrieval_returns_scores():
-
-    retrieval_service = RetrievalService()
+def test_retrieval_returns_scores(retrieval_service):
 
     results = retrieval_service.search(
         query="Python"

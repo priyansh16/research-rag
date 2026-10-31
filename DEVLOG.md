@@ -230,3 +230,33 @@ PDF → semantic document elements → intelligent chunking
 - Never overlap with hard codded characters, it may break sentances, or words in mid way. 
 - overlap corruption
 
+---
+
+## Dependency Injection & Application-Scoped Services (v0.3.0)
+
+### Implementation
+- `AppServices` dataclass holds one shared instance of every service
+- Services built once at startup in `main.py` lifespan, shared via `app.state`
+- `Depends(get_*_service)` factories in `dependencies.py`, used by all routers
+- `RetrievalService` / `GenerationService` now take dependencies in `__init__` instead of building their own
+- Added `tests/test_api.py` — real API calls via `TestClient`, not just service logic
+- Added `e2e` pytest marker to split fast tests from Ollama-dependent ones
+
+### Bug found
+- `/health/full` called `await`-less on an async `OllamaClient.health_check()` → crashed with `TypeError: 'coroutine' object is not subscriptable`
+- Only caught once API-level tests existed — pure unit tests never touched the route layer
+
+### Learning
+- Changing a constructor signature breaks nothing visibly until something instantiates it — only running tests catches it, not reading the diff
+- Unit tests check logic; API tests check wiring (`Depends`, `app.state`, async/await) — need both
+- Application-scoped services remove "which instance is this" bugs by making one-shared-instance structural, not a convention
+
+### Limitations
+- `/health/full` checks run sequentially, not in parallel
+- No CI workflow yet runs the `e2e` split automatically
+
+### Planned Improvements
+- CI workflow: `pytest -m "not e2e"` per commit, `pytest -m e2e` daily
+- Parallelize health checks
+- Alembic migrations, evaluation layer (RAGAS)
+

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from loguru import logger
 
 from src.schemas.generation import GenerationRequest, GenerationResponse
@@ -7,14 +7,16 @@ from src.services.generation.generation_service import (
     GenerationService,
 )
 from src.services.generation.ollama_client import OllamaClientError
+from src.core.dependencies import get_generation_service
 
 router = APIRouter(prefix="/api/v1/generation", tags=["generation"])
 
-generation_service = GenerationService()
-
 
 @router.post("/query", response_model=GenerationResponse)
-async def generate_answer(request: GenerationRequest) -> GenerationResponse:
+async def generate_answer(
+    request: GenerationRequest,
+    generation_service: GenerationService = Depends(get_generation_service),
+    ) -> GenerationResponse:
     """
     Run the full RAG pipeline: validate query -> retrieve chunks ->
     generate a grounded, cited answer via local Ollama model.

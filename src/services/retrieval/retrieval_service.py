@@ -1,20 +1,34 @@
-from typing import List,Dict
+from typing import List, Dict
+import time
+
+from loguru import logger
+
+from src.core.config import settings
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.vectorstore.chroma_service import ChromaService
-from src.core.config import settings
-from loguru import logger
 
 
 
 class RetrievalService:
     """
     Handle semantic retrival using chromaDB.
+    
+    Dependencies are injected during application startup so that
+    heavyweight services are shared across the application.
     """
     
-    def __init__(self):
+    def __init__(
+        self,
+        embedding_service: EmbeddingService,
+        chroma_service: ChromaService,
+        ):
         
-        self.embedding_service = EmbeddingService()
-        self.chroma_service = ChromaService()
+        self.embedding_service = embedding_service
+        self.chroma_service = chroma_service
+        
+        logger.info(
+            "RetrievalService initialized with shared dependencies."
+        )
         
     
     def search(
@@ -22,18 +36,22 @@ class RetrievalService:
         query:str
         ) -> List[Dict]:
         
-        # Step 1 - Embed query
+        retrieval_start = time.perf_counter()
+
+        logger.info("Retrieval request received.")
+        
+        # Step 1 - Generate query embedding
         query_embedding = (
             self.embedding_service.embed_text(query)
         )
         
-        # Step 2 - Vector search
+        # Step 2 - Perform vector search
         results = self.chroma_service.search(
             query_embeddings=query_embedding,
             top_k=settings.TOP_K_RESULTS
         )
         
-        # Step 3 - Formate output
+        # Step 3 -Format response
         
         formatted_results = []
         
@@ -50,8 +68,23 @@ class RetrievalService:
                 {
                     "chunks": doc,
                     "metadata": metadata,
-                    "score": 1-distance
+                    "score": 1 - distance
                 }
+            )
+            
+        retrieval_latency = (
+            time.perf_counter() - retrieval_start
+            ) * 1000
+        
+        if not formatted_results:
+            logger.warning(
+                "Retrieval completed with no matching documents."
+            )
+        else:
+            logger.info(
+                "Retrieval completed | returned_count={} | latency_ms={:.2f}",
+                len(formatted_results),
+                retrieval_latency,
             )
         
         return formatted_results

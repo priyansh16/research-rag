@@ -79,8 +79,11 @@ class ChromaService:
             metadatas=metadata
         )
         
-        logger.info(f"Stored {len(chunks)} chunks in ChromaDB")
-        
+        logger.info(
+            "Document indexed | chunks={} | collection={}",
+            len(chunks),
+            settings.CHROMA_COLLECTION_NAME,
+        )        
     # Read
     def search(
         self, 

@@ -1,5 +1,5 @@
 # RAG Data Infrastructure Platform
-![Status](https://img.shields.io/badge/Status-v0.2.0-yellow)
+![Status](https://img.shields.io/badge/Status-v0.3.0-yellow)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-009688)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange)
@@ -7,21 +7,21 @@
 
 > **Retrieval layer: complete and working**  
 > **Generation layer: complete and working (local Ollama)**  
-> **FastAPI dependency injection: in progress**  
+> **FastAPI dependency injection: complete**  
+> **Application-scoped services: complete**  
 > **Evaluation layer: planned**
 
 ---
 
 ## Current Release
 
-Current Version: **v0.2.0**
+Current Version: **v0.3.0**
 
-This release establishes the complete Retrieval-Augmented Generation
-pipeline together with production-oriented observability, request
-tracing, structured logging, and automated testing.
+This release refactors the application onto FastAPI dependency
+injection and application-scoped service lifecycles. It also adds API-level tests that exercise the real app end-to-end, and splits the test suite into a fast per-commit run and a scheduled Ollama-dependent `e2e` run.
 
-The next milestone (v0.3.0) focuses on introducing application-scoped
-service lifecycles using FastAPI dependency injection.
+The next milestone (v0.4.0) focuses on adding an evaluation layer and then containerizing the application
+with Docker and Docker Compose.
 
 ---
 ## Description
@@ -139,13 +139,19 @@ Grounded Response
 - Component-level health monitoring API with per-service 
   latency tracking and structured degradation reporting
 - Generation layer via Ollama for local LLM inference with cited documents
-- 24 automated unit and integration tests covering ingestion, retrieval, prompt building, guardrails, and generation.
+- FastAPI dependency injection with application-scoped service
+  lifecycle (one shared instance per service, built once at startup)
+- 28 automated tests covering ingestion, retrieval, prompt building,
+  guardrails, generation, and real API/DI wiring end-to-end, split
+  into a fast per-commit suite and a scheduled Ollama-dependent
+  `e2e` suite
 
 ### In Progress
 - LangChain integration for prompt management and 
   retrieval-augmented generation
 - Alembic migrations for schema versioning
 - AWS cloud deployment
+- CI workflow wiring up the per-commit / daily `e2e` test split
 
 ### Planned
 - Streaming response support
@@ -156,13 +162,14 @@ Grounded Response
 
 ## Roadmap
 
-v0.3.0
+v0.3.0 (complete)
 - FastAPI dependency injection
 - Shared service lifecycle
 - Singleton embedding model
-- Introduction of Evals metrics
+- API-level tests and e2e/unit test split
 
 v0.4.0
+- Evaluations with golden dataset and Recall@ metrics
 - Docker
 - Docker Compose
 
@@ -219,6 +226,18 @@ This avoids duplicated search implementations and allows retrieval
 improvements (ranking, filtering, hybrid search, reranking) to
 benefit both APIs automatically.
 
+**Application-scoped services via dependency injection**
+
+Every service is constructed exactly once in `main.py`'s `lifespan()`
+and stored on `app.state.services` (`src/core/application.py`).
+Routers never instantiate a service themselves — they resolve one
+through a `Depends(get_*_service)` factory in
+`src/core/dependencies.py`. This guarantees a single shared instance
+of each service per process (e.g. one loaded embedding model, one
+ChromaDB client) and makes dependencies explicit and swappable for
+testing, instead of each router/service reaching for a global or
+building its own.
+
 ## Project Structure
 
 ```
@@ -229,6 +248,8 @@ research-rag/
 │   │   ├── database.py         # all document store dependencies
 │   │   ├── logging.py          # loguru configuration for strctured logging
 │   │   ├── middleware.py       # Per-request middleware, bindings logs with unique correlation ID
+│   │   ├── application.py      # AppServices: application-scoped service instances
+│   │   ├── dependencies.py     # FastAPI Depends factories resolving shared services
 │   ├── routers/
 │   │   ├── health.py           # Health and observability endpoints
 │   │   ├── documents.py        # Ingestion and document management
@@ -252,7 +273,7 @@ research-rag/
 │   │   │   ├── unstructured_parser.py      # extraction pipeline using unstructured
 │   │   ├── retrieval/
 │   │   │   ├── retrieval_service.py        # Semantic retrival using chromaDB
-│   │   ├── vectorestore/
+│   │   ├── vectorstore/
 │   │   │   ├── chroma_service.py           # Handles vector database operations with health probe and logging
 │   │   ├── generation/
 │   │   │   ├── generation_service.py       # Full Generation pipeline using ollama client
@@ -271,7 +292,9 @@ research-rag/
 │   ├── test_parser.py          # Test unstructured parsing logic
 │   ├── test_retrieval.py       # Test retrieval logic
 │   ├── test_generation.py       # Test generation logic
+│   ├── test_api.py             # API-level tests through FastAPI TestClient (lifespan + DI + routers)
 ├── pyproject.toml              # Dependency management via uv
+├── pytest.ini                  # pytest config, registers the `e2e` marker
 └── README.md
 ```
 
@@ -290,8 +313,14 @@ uv sync
 # Run the API
 uv run uvicorn src.main:app --reload
 
-# Run tests
+# Run all tests (including e2e tests that require a local Ollama server)
 uv run pytest
+
+# Run the fast suite only (per-commit, skips e2e)
+uv run pytest -m "not e2e"
+
+# Run only the e2e suite (needs `ollama serve` running locally)
+uv run pytest -m "e2e"
 ```
 ## API Reference
 

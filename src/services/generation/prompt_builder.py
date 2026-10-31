@@ -6,7 +6,7 @@ citation-numbering logic can be unit tested and iterated on without
 touching orchestration code (this is also where you'd experiment for
 the eval harness — prompt changes are the main lever for groundedness).
 """
-
+from loguru import logger
 from typing import Dict, List
 
 
@@ -42,6 +42,11 @@ def build_generation_prompt(query: str, chunks: List[Dict]) -> str:
     numbered context, then the user's query.
     """
     context_block = build_context_block(chunks)
+    
+    logger.debug(
+        "Generation prompt built | chunks={}",
+        len(chunks),
+    )
 
     return (
         f"{SYSTEM_INSTRUCTIONS}\n\n"

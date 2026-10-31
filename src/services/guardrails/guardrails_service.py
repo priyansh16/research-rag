@@ -78,7 +78,7 @@ class GuardrailsService:
         self._compiled_patterns = [
             re.compile(pattern, re.IGNORECASE) for pattern in self._INJECTION_PATTERNS
         ]
-        logger.debug(
+        logger.info(
             "GuardrailsService initialized with {} patterns",
             len(self._compiled_patterns),
         )
@@ -90,16 +90,25 @@ class GuardrailsService:
         Returns a GuardrailResult. Callers should check `is_safe` and,
         if False, short-circuit before calling retrieval/generation.
         """
+        logger.info("Guardrails validation started.")
         if not query or not query.strip():
+            logger.warning(
+                "Query blocked | violation_type={} | reason={}",
+                GuardrailViolationType.EMPTY_QUERY,
+                "Query is empty."
+            )
+            
             return GuardrailResult(
                 is_safe=False,
                 violation_type=GuardrailViolationType.EMPTY_QUERY,
                 reason="Query is empty.",
             )
+            
 
         if len(query) > settings.GUARDRAILS_MAX_QUERY_LENGTH:
             logger.warning(
-                "Query rejected: length {} exceeds max {}",
+                "Query blocked | violation_type={} | reason=Query length ({}) exceeds maximum allowed ({})",
+                GuardrailViolationType.EXCESSIVE_LENGTH,
                 len(query),
                 settings.GUARDRAILS_MAX_QUERY_LENGTH,
             )
@@ -118,7 +127,10 @@ class GuardrailsService:
             match = pattern.search(normalized)
             if match:
                 logger.warning(
-                    "Query rejected by guardrails: pattern matched.",
+                    "Query blocked | violation_type={} | reason={} | query ={}",
+                    GuardrailViolationType.PROMPT_INJECTION,
+                    "Query appears to contain an instruction-override or prompt-injection attempt.",
+                    query,
                 )
                 return GuardrailResult(
                     is_safe=False,
@@ -129,5 +141,6 @@ class GuardrailsService:
                     ),
                     matched_pattern=pattern.pattern,
                 )
-
+        
+        logger.debug("Guardrails validation passed.")
         return GuardrailResult(is_safe=True)

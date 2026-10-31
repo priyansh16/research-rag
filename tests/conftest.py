@@ -17,6 +17,22 @@ from src.services.guardrails.guardrails_service import (
     GuardrailsService
 )
 
+from src.services.vectorstore.chroma_service import (
+    ChromaService
+)
+
+from src.services.retrieval.retrieval_service import (
+    RetrievalService
+)
+
+from src.services.generation.ollama_client import (
+    OllamaClient
+)
+
+from src.services.generation.generation_service import (
+    GenerationService
+)
+
 
 TEST_PDF_PATH = "tests/data/Priyansh_CV.pdf"
 
@@ -79,3 +95,55 @@ def embedded_chunks(
 @pytest.fixture(scope="session")
 def guardrails():
     return GuardrailsService()
+
+
+@pytest.fixture(scope="session")
+def chroma_service():
+    """
+    Shared ChromaDB client, pointed at the project's persistent store.
+    """
+
+    return ChromaService()
+
+
+@pytest.fixture(scope="session")
+def retrieval_service(
+    embedding_service,
+    chroma_service
+):
+    """
+    Shared retrieval service, wired with the real embedding and
+    vector-store dependencies.
+    """
+
+    return RetrievalService(
+        embedding_service=embedding_service,
+        chroma_service=chroma_service,
+    )
+
+
+@pytest.fixture(scope="session")
+def ollama_client():
+    """
+    Shared Ollama client. Only reachable when `ollama serve` is running
+    locally — tests that need a live call skip automatically otherwise.
+    """
+
+    return OllamaClient()
+
+
+@pytest.fixture(scope="session")
+def generation_service(
+    retrieval_service,
+    guardrails,
+    ollama_client
+):
+    """
+    Shared generation service, wired with its real dependencies.
+    """
+
+    return GenerationService(
+        retrieval_service=retrieval_service,
+        guardrails_service=guardrails,
+        ollama_client=ollama_client,
+    )

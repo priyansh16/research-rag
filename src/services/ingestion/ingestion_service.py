@@ -25,32 +25,42 @@ class IngestionService:
     -> metadata storage
     """
     
-    def __init__(self):
-        self.embedding_service = (
-             EmbeddingService() 
-             )
+    def __init__(
+        self,
+        embedding_service: EmbeddingService,
+        chroma_service: ChromaService
+        ):
+        self.embedding_service = embedding_service
         
-        self.chroma_service = (
-            ChromaService()
+        self.chroma_service = chroma_service
+        logger.info(
+            "IngestionService initialized with shared dependencies."
         )
     
     def ingect_document(
         self,
-        db: Session,
+        doc_service: DocumentService,
         file_path: str,
         document_name: str
         ):
         
-        logger.info(f"Ingesting document: {document_name}")
+        logger.info(
+            "Document ingestion started | filename={}",
+            document_name,
+        )
         
         # Step 1 - Parse
         text = extract_content(file_path)
+        logger.info(
+            "Document parsing completed."
+        )
         
         # Step 2 - Chunk
         chunks = create_chunks(text)
         
         logger.info(
-            f"Created {len(chunks)} chunks"
+            "Chunking completed | chunk_count={}",
+            len(chunks),
         )
         
         # Step 3 - Embed
@@ -58,8 +68,11 @@ class IngestionService:
             self.embedding_service.embed_texts(chunks)
             )
         
-         # Step 4 - Store document metadata in SQL
-        doc_service = DocumentService(db)
+        logger.info(
+            "Embedding generation completed."
+        )
+        
+        # Step 4 - Store document metadata in SQL
         document = doc_service.create_document(
             title=document_name,
             parser=settings.PARSER_BACKEND,
@@ -82,6 +95,11 @@ class IngestionService:
                 }
             )
         
+        logger.info(
+            "Document metadata stored | document_id={}",
+            document.id,
+        )
+        
         # Step 5 - Store in cromaDb
         self.chroma_service.add_document(
             chunks= chunks,
@@ -89,8 +107,13 @@ class IngestionService:
             metadata=metadata
         )
         
+        logger.info(
+            "Vector indexing completed."
+        )
+        
         logger.success(
-            f"Stored {len(chunks)} chunks in ChromaDB"
+            "Document ingestion completed successfully | document_id={}",
+            document.id,
         )
         
         return document

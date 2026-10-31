@@ -11,7 +11,6 @@ the Mac app/installer). Pull a model first: `ollama pull llama3.2:3b`.
 """
 
 import time
-from dataclasses import dataclass
 
 import httpx
 from loguru import logger
@@ -22,13 +21,6 @@ from src.core.config import settings
 class OllamaClientError(Exception):
     """Raised when the Ollama server is unreachable or returns an error."""
 
-
-@dataclass
-class OllamaHealth:
-    healthy: bool
-    latency_ms: float | None = None
-    model_available: bool | None = None
-    error: str | None = None
 
 
 class OllamaClient:
@@ -46,6 +38,11 @@ class OllamaClient:
         self.model = settings.OLLAMA_MODEL
         self.timeout = settings.OLLAMA_TIMEOUT_SECONDS
         self.max_retries = settings.OLLAMA_MAX_RETRIES
+        
+        logger.info(
+            "OllamaClient initialized | model={}",
+            settings.OLLAMA_MODEL,
+            )
 
     async def generate(
         self,
@@ -61,6 +58,13 @@ class OllamaClient:
         that's a config problem, not a transient one, and retrying
         just wastes time before failing anyway.
         """
+        generation_start = time.perf_counter()
+
+        logger.info(
+            "Generation request sent to Ollama | model={}",
+            self.model,
+        )
+        
         payload = {
             "model": self.model,
             "prompt": prompt,
@@ -92,12 +96,26 @@ class OllamaClient:
                 response.raise_for_status()
 
                 data = response.json()
+                
+                latency_ms = (time.perf_counter() - generation_start) * 1000
+                logger.info(
+                    "Ollama response received | model={} | latency_ms={:.2f}",
+                    self.model,
+                    latency_ms,
+                )
+                
+                if attempt > 1:
+                    logger.info(
+                        "Ollama request succeeded after {} attempts.",
+                        attempt,
+                    )
+                    
                 return data.get("response", "").strip()
 
             except httpx.ConnectError as exc:
                 last_error = exc
                 logger.warning(
-                    "Ollama connection failed (attempt {}/{}): {}",
+                    "Ollama connection failed | attempt={}/{} | error={}",
                     attempt,
                     self.max_retries + 1,
                     exc,
@@ -105,7 +123,7 @@ class OllamaClient:
             except httpx.TimeoutException as exc:
                 last_error = exc
                 logger.warning(
-                    "Ollama request timed out (attempt {}/{}): {}",
+                    "Ollama request timed out | attempt={}/{} | error={}",
                     attempt,
                     self.max_retries + 1,
                     exc,
@@ -113,26 +131,39 @@ class OllamaClient:
             except OllamaClientError:
                 raise  # config error, don't retry
             except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "Ollama returned HTTP {}.",
+                    exc.response.status_code,
+                )
                 raise OllamaClientError(
                     f"Ollama returned an error: {exc.response.status_code} "
                     f"{exc.response.text}"
                 ) from exc
 
             if attempt <= self.max_retries:
+                logger.debug(
+                    "Retrying Ollama request after {:.1f}s backoff.",
+                    attempt * 0.5,
+                )
                 time.sleep(attempt * 0.5)  # 0.5s, 1s, ... linear backoff
-
+        
+        logger.error(
+            "Ollama unavailable after {} attempts.",
+            self.max_retries + 1,
+        )
         raise OllamaClientError(
             f"Ollama unreachable at {self.base_url} after "
             f"{self.max_retries + 1} attempts: {last_error}"
         )
 
-    async def health_check(self) -> OllamaHealth:
+    async def health_check(self):
         """
         Probe the Ollama server and confirm the configured model is pulled.
 
         Used by the observability/health API — mirrors how ChromaService
         and EmbeddingService report their own component health.
         """
+        logger.debug("Running Ollama health check.")
         start = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -148,16 +179,27 @@ class OllamaClient:
 
             if not model_available:
                 logger.warning(
-                    "Ollama is up but model '{}' is not pulled. Available: {}",
+                    "Configured Ollama model unavailable | configured_model={} | available_models={}",
                     self.model,
                     models,
                 )
-
-            return OllamaHealth(
-                healthy=True,
-                latency_ms=round(latency_ms, 2),
-                model_available=model_available,
+            
+            logger.debug(
+                "Ollama health check passed | latency_ms={:.2f}",
+                latency_ms,
             )
+
+            return{
+                "status": "ok",
+                "latency_ms": round(latency_ms, 2),
+                "model_available": model_available,
+            }
+            
+           
         except Exception as exc:
             logger.error("Ollama health check failed: {}", exc)
-            return OllamaHealth(healthy=False, error=str(exc))
+            return{
+                "status": "degraded",
+                "model": self.model,
+                "error":str(exc)
+            }
