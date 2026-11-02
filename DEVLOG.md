@@ -282,3 +282,14 @@ PDF → semantic document elements → intelligent chunking
 - Table answers are extracted but retrieve poorly (gmm_q06, ras_q05 found in chunks 52/33, not in top 10):
   grids of names/numbers embed weakly. Candidate fix: table-aware chunking (caption + row-to-text).
 - Chart labels are not extracted by OCR (oli_q07): known parsing limitation, kept in the set.
+
+---
+
+## Retrieval Experiments
+
+Each experiment's hypothesis, setup, results and decision is recorded in
+[`src/services/evaluation/EXPERIMENTS.md`](src/services/evaluation/EXPERIMENTS.md).
+
+- E0, answer reachability: 43/44 answers exist in an indexed chunk → ranking, not ingestion, is the bottleneck.
+- E1, BGE query prefix: not adopted, no effect (hit@3 30 → 31/44, one question).
+- Learning: with 44 answerable questions, 1 question = 2.3 points, so ±1–2 questions is noise. Judge by the Improved/Regressed lists, not aggregate deltas.

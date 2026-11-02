@@ -7,17 +7,24 @@ https://keepachangelog.com/en/1.1.0/
 
 ---
 
-## [0.4.0] - 2026-11-01
+## [Unreleased]
 
 ### Added
-- Retrieval evaluation harness (`src/services/evaluation/`): 49-question set over 5 papers
-  labelled by type (direct / paraphrased / unanswerable) and answer location (body / table / figure);
-  reports hit@1/3/5/10, MRR@10 and doc_hit@k overall and per type, location and document;
-  compares unanswerable vs relevant scores; records git commit, metric and chunk counts per run.
-- Regression test: ingesting two documents stores all chunks for both.
-- Test suite grew from 28 to 77 tests.
+- Retrieval evaluation harness (`src/services/evaluation/run.py`): 61-question golden set over 5 papers
+  (44 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
+  17 unanswerable, tagged `near_miss` / `off_topic`), run directly against `RetrievalService`;
+  reports hit@1/3/5/10, MRR@10 and doc_hit@3 overall and per type, location and document;
+  records git commit, embedding model, distance metric and chunk counts per run.
+- Answer reachability check: whether each answer exists in any indexed chunk of its paper
+  (the ceiling for every hit@k); misses list the chunks that hold the answer.
+- Unanswerable vs relevant score separation, overall and per subtype, to assess "no answer" thresholds.
+- `compare_runs.py`: question-by-question diff between two runs (improved, regressed, rank changes,
+  config differences, unanswerable score shifts).
+- `summarize_results.py`: regenerates `results.md` tables from every run in `results/`.
+- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted).
 - `RetrievalService.search()` accepts an optional `top_k` (defaults to `settings.TOP_K_RESULTS`, rejects values < 1), so callers like the evaluation harness can request k per call without mutating global settings.
 - Ingest log now reports `submitted` vs actually `stored` chunk counts and warns on partial indexing.
+- Test suite grew from 28 to 129 tests (127 fast, 2 `e2e`).
 
 
 ### Changed
@@ -28,6 +35,7 @@ https://keepachangelog.com/en/1.1.0/
 
 - `ChromaService.add_document` generated chunk IDs as `chunk_{i}` per document, so every document after the first collided on existing IDs and Chroma silently skipped them — only 97 of 313 chunks were indexed. IDs are now scoped as `{document_id}_chunk_{chunk_index}`.
 - Rebuilt existing vector stores (delete `chroma_db/` and `rag.db`, re-upload documents) to recover the missing chunks.
+- `pyproject.toml` version was stale at `0.1.0`; set to the current release, `0.3.0`.
 
 ---
 
