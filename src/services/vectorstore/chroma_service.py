@@ -22,8 +22,11 @@ class ChromaService:
     def __init__(self):
         logger.info(f"Initializing ChromaDB at: {settings.CHROMA_DB_DIR}")
         self.client = chromadb.PersistentClient(path=settings.CHROMA_DB_DIR)
+        # Cosine distance (1 - cos) so RetrievalService's `1 - distance`
+        # score is true cosine similarity. Fixed at collection creation.
         self.collection = self.client.get_or_create_collection(
-            name=settings.CHROMA_COLLECTION_NAME
+            name=settings.CHROMA_COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
         )
         logger.info(f"ChromaDB ready - collection '{settings.CHROMA_COLLECTION_NAME}'"
                     f"({self.collection.count()} documents)"
@@ -67,23 +70,40 @@ class ChromaService:
         store chunks + embeddings + metadata.
         """
         
+        # IDs must be unique across the whole collection, so scope them
+        # to the document - otherwise every document collides on chunk_0..N.
         ids = [
-            f"chunk_{i}"
-            for i in range(len(chunks))
+            f"{m['document_id']}_chunk_{m['chunk_index']}"
+            for m in metadata
         ]
         
+        # Chroma skips IDs that already exist without raising, so measure
+        # what was actually stored instead of trusting len(chunks).
+        count_before = self.collection.count()
+
         self.collection.add(
             ids=ids,
             documents=chunks,
             embeddings=embeddings,
             metadatas=metadata
         )
-        
-        logger.info(
-            "Document indexed | chunks={} | collection={}",
-            len(chunks),
-            settings.CHROMA_COLLECTION_NAME,
-        )        
+
+        stored = self.collection.count() - count_before
+
+        if stored != len(chunks):
+            logger.warning(
+                "Partial indexing | submitted={} | stored={} | collection={}",
+                len(chunks),
+                stored,
+                settings.CHROMA_COLLECTION_NAME,
+            )
+        else:
+            logger.info(
+                "Document indexed | submitted={} | stored={} | collection={}",
+                len(chunks),
+                stored,
+                settings.CHROMA_COLLECTION_NAME,
+            )
     # Read
     def search(
         self, 

@@ -7,6 +7,30 @@ https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [0.4.0] - 2026-11-01
+
+### Added
+- Retrieval evaluation harness (`src/services/evaluation/`): 49-question set over 5 papers
+  labelled by type (direct / paraphrased / unanswerable) and answer location (body / table / figure);
+  reports hit@1/3/5/10, MRR@10 and doc_hit@k overall and per type, location and document;
+  compares unanswerable vs relevant scores; records git commit, metric and chunk counts per run.
+- Regression test: ingesting two documents stores all chunks for both.
+- Test suite grew from 28 to 77 tests.
+- `RetrievalService.search()` accepts an optional `top_k` (defaults to `settings.TOP_K_RESULTS`, rejects values < 1), so callers like the evaluation harness can request k per call without mutating global settings.
+- Ingest log now reports `submitted` vs actually `stored` chunk counts and warns on partial indexing.
+
+
+### Changed
+
+- Chroma collection now created with `hnsw:space: cosine` (was default squared L2), so retrieval `score` is true cosine similarity instead of `2·cos − 1`. Rankings are unchanged; applies only to newly created collections.
+
+### Fixed
+
+- `ChromaService.add_document` generated chunk IDs as `chunk_{i}` per document, so every document after the first collided on existing IDs and Chroma silently skipped them — only 97 of 313 chunks were indexed. IDs are now scoped as `{document_id}_chunk_{chunk_index}`.
+- Rebuilt existing vector stores (delete `chroma_db/` and `rag.db`, re-upload documents) to recover the missing chunks.
+
+---
+
 ## [0.3.0] - 2026-10-31
 
 ### Added

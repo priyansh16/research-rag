@@ -33,9 +33,19 @@ class RetrievalService:
     
     def search(
         self,
-        query:str
+        query:str,
+        top_k: int | None = None,
         ) -> List[Dict]:
-        
+        """
+        Retrieve the top_k most similar chunks for a query.
+        Falls back to settings.TOP_K_RESULTS when top_k is not given.
+        """
+
+        k = settings.TOP_K_RESULTS if top_k is None else top_k
+
+        if k < 1:
+            raise ValueError("top_k must be >= 1")
+
         retrieval_start = time.perf_counter()
 
         logger.info("Retrieval request received.")
@@ -48,7 +58,7 @@ class RetrievalService:
         # Step 2 - Perform vector search
         results = self.chroma_service.search(
             query_embeddings=query_embedding,
-            top_k=settings.TOP_K_RESULTS
+            top_k=k
         )
         
         # Step 3 -Format response
