@@ -341,7 +341,7 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
     answerable = [r for r in results if r.answerable]
 
     print(f"\nRetrieval evaluation: {meta['label']}  ({meta['timestamp']}, git {meta['git']})")
-    print(f"  model:      {meta['embedding_model']}")
+    print(f"  model:      {meta['embedding_model']} | query_prefix={meta['query_prefix']!r}")
     print(f"  collection: {meta['collection']} | metric={meta['distance_metric']} | chunks={meta['indexed_chunks']}")
     print(f"  questions:  {meta['questions']} ({len(answerable)} answerable, "
           f"{meta['questions'] - len(answerable)} unanswerable) | app top_k={doc_k}\n")
@@ -425,6 +425,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git": git_revision(),
         "embedding_model": settings.EMBEDDING_MODEL,
+        "query_prefix": settings.EMBEDDING_QUERY_PREFIX or None,
         "collection": settings.CHROMA_COLLECTION_NAME,
         "distance_metric": collection_metadata.get("hnsw:space", "l2 (default)"),
         "indexed_chunks": sum(chunk_counts.values()),

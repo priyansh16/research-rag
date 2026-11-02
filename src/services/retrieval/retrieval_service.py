@@ -52,7 +52,7 @@ class RetrievalService:
         
         # Step 1 - Generate query embedding
         query_embedding = (
-            self.embedding_service.embed_text(query)
+            self.embedding_service.embed_query(query)
         )
         
         # Step 2 - Perform vector search

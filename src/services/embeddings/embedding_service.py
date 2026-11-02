@@ -87,8 +87,16 @@ class EmbeddingService:
             latency_ms,
         )
         return embedding.tolist()
-    
-    
+
+
+    def embed_query(self, query: str) -> List[float]:
+        """
+        Embed a search query, prepending settings.EMBEDDING_QUERY_PREFIX.
+        Chunks go through embed_texts without the prefix, as BGE expects.
+        """
+        return self.embed_text(settings.EMBEDDING_QUERY_PREFIX + query)
+
+
     @retry(
         retry=retry_if_exception_type(RuntimeError),
         stop=stop_after_attempt(3),

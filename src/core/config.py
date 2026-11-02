@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     MAX_CHUNK_SIZE: int =  1200
     OVERLAP_ELEMENTS:int = 2
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    # Prepended to queries only (never to chunks). BGE v1.5 recommends
+    # "Represent this sentence for searching relevant passages: ".
+    EMBEDDING_QUERY_PREFIX: str = ""
     TOP_K_RESULTS:int =  3
     CHROMA_COLLECTION_NAME: str = "research_documents"
     CHROMA_DB_DIR:str = "./chroma_db"
