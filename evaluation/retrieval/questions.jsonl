@@ -1,0 +1,61 @@
+{"id": "gmm_q01", "type": "direct", "location": "body", "question": "How many GMM configurations were evaluated in the grid search?", "doc": "LINHAC_2025.pdf", "must_contain": "15,360"}
+{"id": "gmm_q02", "type": "direct", "location": "body", "question": "How many events does the SHL dataset contain?", "doc": "LINHAC_2025.pdf", "must_contain": "6,814,336"}
+{"id": "gmm_q03", "type": "direct", "location": "body", "question": "In the GMM study on five SHL seasons, how long are the player vectors for defenders and forwards?", "doc": "LINHAC_2025.pdf", "must_contain": "length 13 for defenders"}
+{"id": "gmm_q04", "type": "direct", "location": "body", "question": "How many forwards are in each of the five clusters aggregated over all seasons?", "doc": "LINHAC_2025.pdf", "must_contain": "142, 113, 121"}
+{"id": "gmm_q05", "type": "direct", "location": "table", "question": "Which covariance types were included in the GMM grid search?", "doc": "LINHAC_2025.pdf", "must_contain": "spherical"}
+{"id": "gmm_q06", "type": "direct", "location": "table", "question": "Which defenders are closest to the centroid of cluster D4.19-24?", "doc": "LINHAC_2025.pdf", "must_contain": "matt caito"}
+{"id": "gmm_q07", "type": "paraphrased", "location": "body", "question": "Why did the authors settle on five groups even though the lowest score came at ten?", "doc": "LINHAC_2025.pdf", "must_contain": "consistent with earlier work"}
+{"id": "gmm_q08", "type": "paraphrased", "location": "body", "question": "Which forward developed from an attacking role into someone strong at both ends of the ice?", "doc": "LINHAC_2025.pdf", "must_contain": "richard hugg"}
+{"id": "gmm_q09", "type": "paraphrased", "location": "body", "question": "Which defender kept his defensive strengths but raised most of his other skills by 2023/24?", "doc": "LINHAC_2025.pdf", "must_contain": "rasmus rissanen"}
+{"id": "gmm_q10", "type": "paraphrased", "location": "body", "question": "Why is a probabilistic grouping better than giving each player one fixed category?", "doc": "LINHAC_2025.pdf", "must_contain": "varying degrees of membership"}
+{"id": "gmm_q11", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How much are the players in the top forward cluster paid?", "doc": null, "must_contain": null}
+{"id": "oli_q01", "type": "direct", "location": "body", "question": "How many games are in the SHL, HockeyAllsvenskan and AHL dataset?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "7,532"}
+{"id": "oli_q02", "type": "direct", "location": "body", "question": "What minimum playing time did players need to be included in the player vectors?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "200 minutes"}
+{"id": "oli_q03", "type": "direct", "location": "body", "question": "What value was the fuzziness hyperparameter m set to?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "was set to 1.5"}
+{"id": "oli_q04", "type": "direct", "location": "body", "question": "What share of all events are passes, pass receptions and loose puck recoveries?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "65.1%"}
+{"id": "oli_q05", "type": "direct", "location": "body", "question": "What was the maximum number of iterations used for fuzzy c-means?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "1,000"}
+{"id": "oli_q06", "type": "direct", "location": "table", "question": "How many players are in defender cluster D2?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "229 players"}
+{"id": "oli_q07", "type": "direct", "location": "figure", "question": "What percentage of all events are passes?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "25.75"}
+{"id": "oli_q08", "type": "paraphrased", "location": "body", "question": "Which group of defenders is best when their team is shorthanded?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "strengths for d5"}
+{"id": "oli_q09", "type": "paraphrased", "location": "body", "question": "Why were the event counts divided by each player's time on ice?", "doc": "LINHAC_2024_Oliver.pdf", "must_contain": "playing time disparities"}
+{"id": "oli_q10", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "What hardware was used to run the clustering experiments?", "doc": null, "must_contain": null}
+{"id": "eri_q01", "type": "direct", "location": "body", "question": "How many analysts were employed by NHL teams by 2021?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "75 analysts"}
+{"id": "eri_q02", "type": "direct", "location": "body", "question": "In which season was Plus/Minus introduced in the NHL?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "1959/60"}
+{"id": "eri_q03", "type": "direct", "location": "body", "question": "What CF/60 threshold was used to categorise NHL teams?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "threshold to 55"}
+{"id": "eri_q04", "type": "direct", "location": "body", "question": "How much did one-timers increase in the NHL over the last three years?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "30.9%"}
+{"id": "eri_q05", "type": "direct", "location": "table", "question": "What was the NHL CF/60 in the 17/18 season?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "57.4"}
+{"id": "eri_q06", "type": "direct", "location": "table", "question": "What average playoff points did the best xGF% team get in the xG era?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "2.80"}
+{"id": "eri_q07", "type": "paraphrased", "location": "body", "question": "Why is the shot threshold lower for the Swedish league than for the NHL?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "larger rinks"}
+{"id": "eri_q08", "type": "paraphrased", "location": "body", "question": "What do the authors call teams that both take and concede many shot attempts?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "high cf and high ca"}
+{"id": "eri_q09", "type": "paraphrased", "location": "body", "question": "Why is there no playoff result for the 2019/20 SHL season?", "doc": "LINHAC_2022_Erik.pdf", "must_contain": "covid-19"}
+{"id": "ras_q01", "type": "direct", "location": "body", "question": "Which NHL season's data is used to identify player roles?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "2021-2022 nhl"}
+{"id": "ras_q02", "type": "direct", "location": "body", "question": "How many variables were derived from the play-by-play and shift data?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "46 variables"}
+{"id": "ras_q03", "type": "direct", "location": "body", "question": "How many defenders met the minimum playing time requirement?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "263 (out of 345)"}
+{"id": "ras_q04", "type": "direct", "location": "body", "question": "How many iterations of parallel analysis were run to choose the number of principal components?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "100,000 iterations"}
+{"id": "ras_q05", "type": "direct", "location": "table", "question": "Which players are given as examples of the offensive specialist forwards?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "connor mcdavid"}
+{"id": "ras_q06", "type": "paraphrased", "location": "body", "question": "Which defender earns the least compared with players in a similar role?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "oliver kylington"}
+{"id": "ras_q07", "type": "paraphrased", "location": "body", "question": "Which teams missed the playoffs but were grouped with the playoff teams by roster composition?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "anaheim ducks"}
+{"id": "ras_q08", "type": "paraphrased", "location": "body", "question": "Why were contract values log-transformed before comparing players?", "doc": "MLSA23-RASMAS.pdf", "must_contain": "right-skewed"}
+{"id": "bic_q01", "type": "direct", "location": "body", "question": "How many published mixture model parameter estimates were taken from the literature?", "doc": "GMM_BIC.pdf", "must_contain": "43 published estimates"}
+{"id": "bic_q02", "type": "direct", "location": "body", "question": "How many data sets were generated for each simulation experiment?", "doc": "GMM_BIC.pdf", "must_contain": "50 data sets"}
+{"id": "bic_q03", "type": "direct", "location": "body", "question": "How many of the 82 galaxy data points fall in the middle component when G = 3?", "doc": "GMM_BIC.pdf", "must_contain": "72 of the 82"}
+{"id": "bic_q04", "type": "direct", "location": "body", "question": "What P-value did the Kolmogorov-Smirnov normality test give for the middle galaxy group?", "doc": "GMM_BIC.pdf", "must_contain": "0.254"}
+{"id": "bic_q05", "type": "direct", "location": "body", "question": "How does BIC split its posterior mass between G = 3 and G = 6 for the galaxy data?", "doc": "GMM_BIC.pdf", "must_contain": "g = 6 (75%)"}
+{"id": "bic_q06", "type": "paraphrased", "location": "body", "question": "Which criterion for picking the number of mixture components did best in the simulation comparison?", "doc": "GMM_BIC.pdf", "must_contain": "bic clearly outperformed"}
+{"id": "bic_q07", "type": "paraphrased", "location": "body", "question": "Why does AIC tend to choose too many mixture components?", "doc": "GMM_BIC.pdf", "must_contain": "penalizes models"}
+{"id": "bic_q08", "type": "paraphrased", "location": "body", "question": "Why is the number of Gaussian components not always the same as the number of clusters?", "doc": "GMM_BIC.pdf", "must_contain": "non-gaussian distribution"}
+{"id": "gen_q01", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How many goals did Connor McDavid score in the 2021-2022 season?", "doc": null, "must_contain": null}
+{"id": "gen_q02", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "Which team won the Stanley Cup in 2023?", "doc": null, "must_contain": null}
+{"id": "gen_q03", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "What learning rate was used to train the neural network?", "doc": null, "must_contain": null}
+{"id": "unk_q01", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How long did the full-factorial GMM grid search take to run?", "doc": null, "must_contain": null}
+{"id": "unk_q02", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "What was the average attendance at SHL games during the seasons studied?", "doc": null, "must_contain": null}
+{"id": "unk_q03", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "Which player clusters were found for women's hockey leagues?", "doc": null, "must_contain": null}
+{"id": "unk_q04", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How did referee decisions influence the number of penalties called?", "doc": null, "must_contain": null}
+{"id": "unk_q05", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How were player roles identified for the Olympic hockey tournament?", "doc": null, "must_contain": null}
+{"id": "unk_q06", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How does ice temperature affect the number of one-timers?", "doc": null, "must_contain": null}
+{"id": "unk_q07", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "What accuracy did a neural network baseline reach compared with the Gaussian mixture model?", "doc": null, "must_contain": null}
+{"id": "unk_q08", "type": "unanswerable", "subtype": "near_miss", "location": null, "question": "How many viewers watched the SHL playoff finals on television?", "doc": null, "must_contain": null}
+{"id": "unk_q09", "type": "unanswerable", "subtype": "off_topic", "location": null, "question": "How much does Donald Trump earn?", "doc": null, "must_contain": null}
+{"id": "unk_q10", "type": "unanswerable", "subtype": "off_topic", "location": null, "question": "What is Mark Zuckerberg's net worth?", "doc": null, "must_contain": null}
+{"id": "unk_q11", "type": "unanswerable", "subtype": "off_topic", "location": null, "question": "How do I bake sourdough bread?", "doc": null, "must_contain": null}
+{"id": "unk_q12", "type": "unanswerable", "subtype": "off_topic", "location": null, "question": "What is the boiling point of water at sea level?", "doc": null, "must_contain": null}

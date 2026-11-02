@@ -9,7 +9,7 @@
 > **Generation layer: complete and working (local Ollama)**  
 > **FastAPI dependency injection: complete**  
 > **Application-scoped services: complete**  
-> **Evaluation layer: planned**
+> **Evaluation layer: in progress (retrieval harness and experiments)**
 
 ---
 
@@ -141,12 +141,15 @@ Grounded Response
 - Generation layer via Ollama for local LLM inference with cited documents
 - FastAPI dependency injection with application-scoped service
   lifecycle (one shared instance per service, built once at startup)
-- 28 automated tests covering ingestion, retrieval, prompt building,
-  guardrails, generation, and real API/DI wiring end-to-end, split
-  into a fast per-commit suite and a scheduled Ollama-dependent
-  `e2e` suite
+- Retrieval evaluation harness: hit@k, MRR and answer reachability on a
+  61-question golden set, with run-to-run comparison per question
+- 129 automated tests covering ingestion, retrieval, prompt building,
+  guardrails, generation, evaluation metrics, and real API/DI wiring
+  end-to-end, split into a fast per-commit suite (127) and a scheduled
+  Ollama-dependent `e2e` suite (2)
 
 ### In Progress
+- Retrieval experiments (chunk dedup, chunking, reranking); see [Retrieval Evaluation](#retrieval-evaluation)
 - LangChain integration for prompt management and 
   retrieval-augmented generation
 - Alembic migrations for schema versioning
@@ -155,8 +158,36 @@ Grounded Response
 
 ### Planned
 - Streaming response support
-- Retrieval quality evaluation using recall and MRR metrics
+- Generation quality evaluation (faithfulness, answer relevance) with RAGAS
 - Swap SQLite for PostgreSQL for production readiness
+
+---
+
+## Retrieval Evaluation
+
+A hand-labelled set of 61 questions over the 5 indexed papers (44 answerable, 17 unanswerable),
+run directly against `RetrievalService` with no HTTP and no LLM.
+
+| # | Experiment | hit@1 | hit@3 | hit@5 | MRR@10 | Verdict |
+|---|---|---|---|---|---|---|
+| — | Baseline | 19 | **30** | 35 | 0.576 | Reference |
+| E0 | Answer reachability | — | — | — | — | Diagnostic: 43/44 answers reachable |
+| E1 | BGE query prefix | 18 | **31** | 33 | 0.561 | Not adopted, no effect |
+| E2 | Neighbour dedup | | | | | Planned |
+
+Counts are out of 44 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
+
+```bash
+# Run the evaluation (writes results/<date>_<label>.json)
+uv run python -m evaluation.retrieval.run --label <label>
+
+# Compare two runs question by question
+uv run python -m evaluation.retrieval.compare_runs <label_a> <label_b>
+
+# Regenerate the results.md tables from all runs
+uv run python -m evaluation.retrieval.summarize_results
+```
 
 ---
 
@@ -263,10 +294,10 @@ research-rag/
 │   │   ├── generation.py      # Request and Response schema for Generation pipeline
 │   ├── services/
 │   │   ├── embeddings/
-│   │   │   ├── embeddings_service.py       # Embedding generation with retry logic and health probing
+│   │   │   ├── embedding_service.py        # Embedding generation with retry logic and health probing
 │   │   ├── ingestion/
 │   │   │   ├── ingestion_service.py        # Full ingestion pipeline.
-│   │   ├── parser/
+│   │   ├── parsers/
 │   │   │   ├── fitz_parser.py              # Inital extraction pipeline using pdfplumber and fitz
 │   │   │   ├── parsing_pipeline.py         # Abstraction layer for fitz, unstructured parser
 │   │   │   ├── pdf_utils.py                # Util file used by fitz parser
@@ -284,6 +315,17 @@ research-rag/
 │   │   ├── chunking.py         # chunking pipeline
 │   │   ├── document_service.py         # Manages all document-level persistence operations with health probe 
 │   ├── main.py                  # FastAPI app entry point
+├── evaluation/
+│   ├── retrieval/
+│   │   ├── run.py                  # Retrieval evaluation harness: hit@k, MRR, reachability per run
+│   │   ├── metrics.py              # Pure metric functions (relevance, ranks, hit@k, score separation)
+│   │   ├── compare_runs.py         # Question-by-question diff between two runs
+│   │   ├── summarize_results.py    # Regenerates results.md from all runs
+│   │   ├── questions.jsonl         # Golden question set (answerable + unanswerable)
+│   │   ├── EXPERIMENTS.md          # Experiment summary table and decisions
+│   │   ├── results.md              # Generated tables for every run (do not edit)
+│   │   ├── results/                # One JSON per run (<date>_<label>.json)
+│   │   ├── comparisons/            # Saved compare_runs outputs
 ├── tests/
 │   ├── data/                   # sample pdf file
 │   ├── conftest.py             #configures different services for whole test suites, like parsing, chunking etc.
@@ -293,8 +335,14 @@ research-rag/
 │   ├── test_retrieval.py       # Test retrieval logic
 │   ├── test_generation.py       # Test generation logic
 │   ├── test_api.py             # API-level tests through FastAPI TestClient (lifespan + DI + routers)
+│   ├── test_eval_metrics.py    # Evaluation metrics, question validation, reachability
+│   ├── test_compare_runs.py    # Run-to-run comparison
+│   ├── test_summarize_results.py # results.md generation
 ├── pyproject.toml              # Dependency management via uv
 ├── pytest.ini                  # pytest config, registers the `e2e` marker
+├── Makefile                    # `make run` starts the API with reload
+├── CHANGELOG.md                # Release notes
+├── DEVLOG.md                   # Development journal and learnings
 └── README.md
 ```
 
