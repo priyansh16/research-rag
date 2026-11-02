@@ -57,6 +57,9 @@ class Comparison:
     unanswerable: List[QuestionChange] = field(default_factory=list)
     only_a: List[str] = field(default_factory=list)
     only_b: List[str] = field(default_factory=list)
+    # Overall metrics only count answerable questions, so they stay
+    # comparable when just unanswerable questions were added or removed.
+    answerable_sets_differ: bool = False
 
 
 # Loading
@@ -84,10 +87,14 @@ def load_run(path: Path) -> Tuple[Run, Dict[str, Dict]]:
 
 # Comparison
 def compare_questions(a: Dict[str, Dict], b: Dict[str, Dict], k: int) -> Comparison:
+    def answerable_ids(records: Dict[str, Dict]) -> set:
+        return {qid for qid, record in records.items() if record.get("doc") is not None}
+
     comparison = Comparison(
         k=k,
         only_a=sorted(a.keys() - b.keys()),
         only_b=sorted(b.keys() - a.keys()),
+        answerable_sets_differ=answerable_ids(a) != answerable_ids(b),
     )
 
     for qid in sorted(a.keys() & b.keys()):
@@ -246,8 +253,10 @@ def format_comparison(
         lines.append(f"Only in A ({len(comparison.only_a)}): {', '.join(comparison.only_a)}")
     if comparison.only_b:
         lines.append(f"Only in B ({len(comparison.only_b)}): {', '.join(comparison.only_b)}")
-    if comparison.only_a or comparison.only_b:
-        lines.append("The question sets differ, so the overall metrics are not directly comparable.")
+    if comparison.answerable_sets_differ:
+        lines.append("The answerable question sets differ, so the overall metrics are not directly comparable.")
+    elif comparison.only_a or comparison.only_b:
+        lines.append("Only unanswerable questions differ; the overall metrics cover the same answerable questions.")
 
     return "\n".join(lines).rstrip() + "\n"
 

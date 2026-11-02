@@ -33,4 +33,4 @@ Unanswerable top-1 score, lower is better (5)
   oli_q10    near_miss  0.736 -> 0.736  (+0.000)
 
 Only in B (12): unk_q01, unk_q02, unk_q03, unk_q04, unk_q05, unk_q06, unk_q07, unk_q08, unk_q09, unk_q10, unk_q11, unk_q12
-The question sets differ, so the overall metrics are not directly comparable.
+Only unanswerable questions differ; the overall metrics cover the same answerable questions.

@@ -90,6 +90,28 @@ def test_question_set_differences():
     assert c.only_a == ["old"] and c.only_b == ["new"]
 
 
+def test_answerable_sets_differ_only_for_answerable_changes():
+    base = by_id(q("a1", 1), u("u1", 0.5))
+
+    added_unanswerable = compare_questions(base, by_id(q("a1", 1), u("u1", 0.5), u("u2", 0.6)), k=3)
+    added_answerable = compare_questions(base, by_id(q("a1", 1), q("a2", 2), u("u1", 0.5)), k=3)
+
+    assert added_unanswerable.only_b == ["u2"] and not added_unanswerable.answerable_sets_differ
+    assert added_answerable.only_b == ["a2"] and added_answerable.answerable_sets_differ
+
+
+def test_question_set_note_wording(tmp_path):
+    path_a = write(tmp_path, "2026-11-01_a.json", make_report([q("a1", 1)], timestamp="2026-11-01T00:00:00+00:00"))
+    path_b = write(tmp_path, "2026-11-02_b.json", make_report([q("a1", 1), u("u1", 0.5)]))
+    run_a, rec_a = load_run(path_a)
+    run_b, rec_b = load_run(path_b)
+
+    text = format_comparison(run_a, run_b, compare_questions(rec_a, rec_b, k=3))
+
+    assert "Only unanswerable questions differ" in text
+    assert "not directly comparable" not in text
+
+
 def test_flags_label_changes():
     a = by_id(q("x", None, must_contain="length 13"))
     b = by_id(q("x", 2, must_contain="length 13 for defenders"))
