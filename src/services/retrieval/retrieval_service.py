@@ -9,6 +9,31 @@ from src.services.vectorstore.chroma_service import ChromaService
 
 
 
+def drop_neighbor_chunks(
+    results: List[Dict],
+    window: int,
+    top_k: int,
+) -> List[Dict]:
+    """
+    Keep results in rank order, skipping any chunk within ±window chunk
+    positions of an already-kept chunk from the same document, until
+    top_k results are kept. window=0 just truncates to top_k.
+    """
+    kept: List[Dict] = []
+    for result in results:
+        if len(kept) == top_k:
+            break
+        metadata = result["metadata"]
+        if window > 0 and any(
+            k["metadata"]["document_id"] == metadata["document_id"]
+            and abs(k["metadata"]["chunk_index"] - metadata["chunk_index"]) <= window
+            for k in kept
+        ):
+            continue
+        kept.append(result)
+    return kept
+
+
 class RetrievalService:
     """
     Handle semantic retrival using chromaDB.
@@ -55,10 +80,13 @@ class RetrievalService:
             self.embedding_service.embed_text(query)
         )
         
-        # Step 2 - Perform vector search
+        # Step 2 - Perform vector search. With neighbour dropping on, fetch a
+        # larger pool: each kept chunk removes at most 2*window neighbours,
+        # so k * (2*window + 1) candidates always leave k results.
+        window = settings.RETRIEVAL_NEIGHBOR_WINDOW
         results = self.chroma_service.search(
             query_embeddings=query_embedding,
-            top_k=k
+            top_k=k * (2 * window + 1)
         )
         
         # Step 3 -Format response
@@ -81,7 +109,10 @@ class RetrievalService:
                     "score": 1 - distance
                 }
             )
-            
+
+        # Step 4 - Drop near-duplicate neighbours, keep top k
+        formatted_results = drop_neighbor_chunks(formatted_results, window, k)
+
         retrieval_latency = (
             time.perf_counter() - retrieval_start
             ) * 1000

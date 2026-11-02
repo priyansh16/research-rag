@@ -80,3 +80,25 @@ def test_retrieval_rejects_invalid_top_k(retrieval_service):
             query="ice hockey analytics",
             top_k=0
         )
+
+
+def test_retrieval_neighbor_window_drops_adjacent_chunks(retrieval_service, monkeypatch):
+
+    from src.core.config import settings
+
+    monkeypatch.setattr(settings, "RETRIEVAL_NEIGHBOR_WINDOW", 2)
+
+    results = retrieval_service.search(
+        query="ice hockey analytics",
+        top_k=5
+    )
+
+    assert len(results) == 5
+
+    positions = [
+        (r["metadata"]["document_id"], r["metadata"]["chunk_index"])
+        for r in results
+    ]
+    for i, (doc_a, index_a) in enumerate(positions):
+        for doc_b, index_b in positions[i + 1:]:
+            assert not (doc_a == doc_b and abs(index_a - index_b) <= 2)

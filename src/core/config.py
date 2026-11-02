@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     OVERLAP_ELEMENTS:int = 2
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     TOP_K_RESULTS:int =  3
+    # Drop chunks within ±N positions of a higher-ranked chunk from the same
+    # document (overlapping chunks are near-duplicates). 0 = off.
+    RETRIEVAL_NEIGHBOR_WINDOW: int = 0
     CHROMA_COLLECTION_NAME: str = "research_documents"
     CHROMA_DB_DIR:str = "./chroma_db"
     HEALTH_PROBE_TEXT: str = "health check"
