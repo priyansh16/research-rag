@@ -269,9 +269,16 @@ PDF → semantic document elements → intelligent chunking
 - Chunk IDs were `chunk_{i}` per document, so later documents collided with earlier ones and Chroma silently skipped them — 97 of 313 chunks indexed, 3 of 5 PDFs had zero chunks; fixed by scoping IDs to `{document_id}_chunk_{chunk_index}`.
 - Learning: a successful ingest call doesn't prove storage — reconcile vector store counts against SQL `chunk_count` before trusting any retrieval evaluation.
 
+## Evaluation Harness
+
 ### first run (before fixing the question labels): hit@3 0.68 · hit@5 0.82 · hit@10 0.91 · MRR 0.58 · doc_hit@3 0.89
 - Right chunk usually retrieved but ranked low (hit@10 ≫ hit@3) → ranking problem, not coverage.
 - Right paper found more often than right passage (doc_hit@3 0.89 vs hit@3 0.68).
 - Paraphrased questions land in the wrong paper more often (doc_hit@3 0.73 vs 0.97 direct).
 - Own paper scores lowest (hit@3 0.40): overlapping papers and generic background chunks compete.
 - No clean score threshold (unanswerable max 0.77 > relevant min 0.64) → "no answer" handled in generation.
+
+###
+- Table answers are extracted but retrieve poorly (gmm_q06, ras_q05 found in chunks 52/33, not in top 10):
+  grids of names/numbers embed weakly. Candidate fix: table-aware chunking (caption + row-to-text).
+- Chart labels are not extracted by OCR (oli_q07): known parsing limitation, kept in the set.

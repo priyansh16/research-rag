@@ -1,6 +1,6 @@
 {"id": "gmm_q01", "type": "direct", "location": "body", "question": "How many GMM configurations were evaluated in the grid search?", "doc": "LINHAC_2025.pdf", "must_contain": "15,360"}
 {"id": "gmm_q02", "type": "direct", "location": "body", "question": "How many events does the SHL dataset contain?", "doc": "LINHAC_2025.pdf", "must_contain": "6,814,336"}
-{"id": "gmm_q03", "type": "direct", "location": "body", "question": "What is the length of the player vectors for defenders and for forwards?", "doc": "LINHAC_2025.pdf", "must_contain": "length 13 for defenders"}
+{"id": "gmm_q03", "type": "direct", "location": "body", "question": "In the GMM study on five SHL seasons, how long are the player vectors for defenders and forwards?", "doc": "LINHAC_2025.pdf", "must_contain": "length 13 for defenders"}
 {"id": "gmm_q04", "type": "direct", "location": "body", "question": "How many forwards are in each of the five clusters aggregated over all seasons?", "doc": "LINHAC_2025.pdf", "must_contain": "142, 113, 121"}
 {"id": "gmm_q05", "type": "direct", "location": "table", "question": "Which covariance types were included in the GMM grid search?", "doc": "LINHAC_2025.pdf", "must_contain": "spherical"}
 {"id": "gmm_q06", "type": "direct", "location": "table", "question": "Which defenders are closest to the centroid of cluster D4.19-24?", "doc": "LINHAC_2025.pdf", "must_contain": "matt caito"}
