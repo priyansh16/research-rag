@@ -19,7 +19,7 @@ import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 from loguru import logger
 
@@ -27,11 +27,14 @@ from src.core.config import settings
 from src.services.evaluation.metrics import (
     QuestionResult,
     RetrievedChunk,
+    find_answer_chunks,
     group_by,
     is_relevant,
     normalize_for_match,
     percentile,
+    reachability,
     score_separation,
+    score_separation_by_subtype,
     summarize,
 )
 
@@ -42,6 +45,7 @@ DEFAULT_OUT_DIR = EVAL_DIR / "results"
 DEFAULT_KS = "1,3,5,10"
 
 VALID_TYPES = {"direct", "paraphrased", "unanswerable"}
+VALID_SUBTYPES = {"near_miss", "off_topic"}
 WARMUP_QUERY = "warm-up query to load the embedding model"
 EXCERPT_CHARS = 160
 
@@ -58,6 +62,13 @@ def validate_question(q: Dict) -> List[str]:
     q_type = q.get("type")
     if q_type and q_type not in VALID_TYPES:
         errors.append(f"unknown type '{q_type}' (expected one of {sorted(VALID_TYPES)})")
+
+    subtype = q.get("subtype")
+    if subtype is not None:
+        if q_type != "unanswerable":
+            errors.append("'subtype' is only for unanswerable questions")
+        elif subtype not in VALID_SUBTYPES:
+            errors.append(f"unknown subtype '{subtype}' (expected one of {sorted(VALID_SUBTYPES)})")
 
     if q_type == "unanswerable":
         if q.get("doc") is not None or q.get("must_contain") is not None:
@@ -179,13 +190,13 @@ def build_services():
     return chroma_service, retrieval_service
 
 
-def indexed_chunk_counts(chroma_service) -> Dict[str, int]:
-    """Chunks per document actually stored in Chroma."""
-    counts: Dict[str, int] = {}
-    for metadata in chroma_service.collection.get(include=["metadatas"])["metadatas"]:
-        name = metadata["document_name"]
-        counts[name] = counts.get(name, 0) + 1
-    return dict(sorted(counts.items()))
+def load_indexed_chunks(chroma_service) -> Dict[str, List[Tuple[int, str]]]:
+    """Every stored chunk as {document_name: [(chunk_index, text), ...]}."""
+    stored = chroma_service.collection.get(include=["documents", "metadatas"])
+    chunks: Dict[str, List[Tuple[int, str]]] = {}
+    for text, metadata in zip(stored["documents"], stored["metadatas"]):
+        chunks.setdefault(metadata["document_name"], []).append((metadata["chunk_index"], text))
+    return dict(sorted(chunks.items()))
 
 
 def to_chunks(raw_results: List[Dict]) -> List[RetrievedChunk]:
@@ -200,7 +211,12 @@ def to_chunks(raw_results: List[Dict]) -> List[RetrievedChunk]:
     ]
 
 
-def evaluate(questions: List[Dict], retrieval_service, k_max: int) -> List[QuestionResult]:
+def evaluate(
+    questions: List[Dict],
+    retrieval_service,
+    k_max: int,
+    indexed_chunks: Dict[str, List[Tuple[int, str]]],
+) -> List[QuestionResult]:
     # The first call pays one-off warm-up costs; keep it out of the latency numbers.
     retrieval_service.search(WARMUP_QUERY, top_k=1)
 
@@ -209,6 +225,12 @@ def evaluate(questions: List[Dict], retrieval_service, k_max: int) -> List[Quest
         start = time.perf_counter()
         raw = retrieval_service.search(q["question"], top_k=k_max)
         latency_ms = (time.perf_counter() - start) * 1000
+
+        # Experiment 0: is the answer in the index at all, ranked or not?
+        answer_chunks = (
+            find_answer_chunks(indexed_chunks.get(q["doc"], []), q["must_contain"])
+            if q.get("doc") else None
+        )
 
         results.append(
             QuestionResult(
@@ -219,6 +241,8 @@ def evaluate(questions: List[Dict], retrieval_service, k_max: int) -> List[Quest
                 must_contain=q.get("must_contain"),
                 retrieved=to_chunks(raw),
                 latency_ms=latency_ms,
+                answer_chunks=answer_chunks,
+                subtype=q.get("subtype"),
             )
         )
         print(f"\r  evaluated {i}/{len(questions)}", end="", file=sys.stderr, flush=True)
@@ -241,10 +265,15 @@ def build_report(results: List[QuestionResult], ks: List[int], doc_k: int, meta:
         "meta": meta,
         "summary": {
             "overall": summarize(results, ks, doc_k),
+            # Same metrics over questions whose answer exists in the index:
+            # retrieval quality with ingestion failures taken out.
+            "overall_reachable": summarize([r for r in results if r.reachable], ks, doc_k),
+            "reachability": reachability(results),
             "by_type": _summaries("type"),
             "by_location": _summaries("location"),
             "by_doc": _summaries("doc"),
             "unanswerable": score_separation(results),
+            "unanswerable_by_subtype": score_separation_by_subtype(results),
             "latency_ms": {
                 "p50": round(percentile(latencies, 50), 2),
                 "p95": round(percentile(latencies, 95), 2),
@@ -259,11 +288,14 @@ def question_record(r: QuestionResult) -> Dict:
     return {
         "id": r.id,
         "type": r.type,
+        "subtype": r.subtype,
         "location": r.location,
         "doc": r.doc,
         "must_contain": r.must_contain,
         "rank": r.rank,
         "doc_rank": r.doc_rank,
+        "reachable": r.reachable,
+        "answer_chunks": r.answer_chunks,
         "top_score": round(r.top_score, 4) if r.top_score is not None else None,
         "latency_ms": round(r.latency_ms, 2),
         "retrieved": [
@@ -314,7 +346,17 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
     print(f"  questions:  {meta['questions']} ({len(answerable)} answerable, "
           f"{meta['questions'] - len(answerable)} unanswerable) | app top_k={doc_k}\n")
 
-    print(format_table("Overall", {"all": summary["overall"]}))
+    reach = summary["reachability"]
+    print(f"Answer reachability: {reach['reachable']}/{reach['n']} answers exist in an indexed chunk "
+          f"(ceiling for every hit@k: {_fmt(reach['rate'])})")
+    if reach["unreachable_ids"]:
+        print(f"  unreachable: {', '.join(reach['unreachable_ids'])}")
+    print()
+
+    print(format_table("Overall", {
+        "all": summary["overall"],
+        "reachable only": summary["overall_reachable"],
+    }))
     print(format_table("By type", summary["by_type"]))
     print(format_table("By location", summary["by_location"]))
     print(format_table("By document", summary["by_doc"]))
@@ -325,7 +367,12 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
           f"max={_fmt(sep['unanswerable_top1_max'])} (n={sep['unanswerable_n']})")
     print(f"  relevant chunk score:     min={_fmt(sep['relevant_chunk_score_min'])} "
           f"median={_fmt(sep['relevant_chunk_score_median'])} (n={sep['relevant_chunk_n']})")
-    print(f"  clean threshold possible: {_fmt(sep['clean_threshold_possible'])}\n")
+    print(f"  clean threshold possible: {_fmt(sep['clean_threshold_possible'])}")
+    for subtype, sub in summary["unanswerable_by_subtype"].items():
+        print(f"  {subtype:<10} top-1: mean={_fmt(sub['unanswerable_top1_mean'])} "
+              f"max={_fmt(sub['unanswerable_top1_max'])} (n={sub['unanswerable_n']}) "
+              f"| below every relevant chunk: {_fmt(sub['clean_threshold_possible'])}")
+    print()
 
     latency = summary["latency_ms"]
     print(f"Latency (ms, after warm-up): p50={latency['p50']} p95={latency['p95']} max={latency['max']}\n")
@@ -335,7 +382,12 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
     for r in misses:
         top = r.retrieved[0] if r.retrieved else None
         top_desc = f"{top.document_name}#{top.chunk_index} ({top.score:.2f})" if top else "-"
-        print(f"  {r.id:<10} rank={_fmt(r.rank):<4} doc_rank={_fmt(r.doc_rank):<4} top={top_desc}")
+        answer_in = (
+            "UNREACHABLE" if r.reachable is False
+            else ",".join(str(i) for i in r.answer_chunks or []) or "-"
+        )
+        print(f"  {r.id:<10} rank={_fmt(r.rank):<4} doc_rank={_fmt(r.doc_rank):<4} "
+              f"answer_in={answer_in:<12} top={top_desc}")
     print()
 
 
@@ -360,7 +412,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Reconcile before evaluating: a question whose document isn't indexed
     # would silently score 0 (the v0.4.0 chunk-ID bug looked exactly like that).
-    chunk_counts = indexed_chunk_counts(chroma_service)
+    indexed_chunks = load_indexed_chunks(chroma_service)
+    chunk_counts = {doc: len(chunks) for doc, chunks in indexed_chunks.items()}
     missing = sorted({q["doc"] for q in questions if q.get("doc")} - chunk_counts.keys())
     if missing:
         print(f"Documents referenced by questions but not indexed: {missing}", file=sys.stderr)
@@ -384,7 +437,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
 
     # Retrieve deep enough for both the largest k and the app's own top_k.
-    results = evaluate(questions, retrieval_service, k_max=max(*ks, doc_k))
+    results = evaluate(questions, retrieval_service, k_max=max(*ks, doc_k), indexed_chunks=indexed_chunks)
     report = build_report(results, ks, doc_k, meta)
 
     print_report(report, results, doc_k)

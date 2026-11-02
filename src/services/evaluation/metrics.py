@@ -15,7 +15,7 @@ import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
 from statistics import mean, median
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 # Whitespace plus every dash-like character PDF extraction produces:
@@ -58,10 +58,26 @@ class QuestionResult:
     must_contain: Optional[str]
     retrieved: List[RetrievedChunk] = field(default_factory=list)
     latency_ms: float = 0.0
+    # chunk_index of every chunk in the expected doc that contains the answer,
+    # across the whole index (not just what was retrieved). None = not checked.
+    answer_chunks: Optional[List[int]] = None
+    # Unanswerable only: "near_miss" (on-topic, fact absent) or "off_topic".
+    subtype: Optional[str] = None
 
     @property
     def answerable(self) -> bool:
         return self.doc is not None
+
+    @property
+    def reachable(self) -> Optional[bool]:
+        """
+        Whether the answer exists in any indexed chunk of the expected doc.
+        False means no retriever could find it: an ingestion/chunking or
+        labelling problem, not a ranking one.
+        """
+        if not self.answerable or self.answer_chunks is None:
+            return None
+        return bool(self.answer_chunks)
 
     @property
     def rank(self) -> Optional[int]:
@@ -106,6 +122,30 @@ def first_doc_rank(chunks: Sequence[RetrievedChunk], doc: str) -> Optional[int]:
         if chunk.document_name == doc:
             return rank
     return None
+
+
+def find_answer_chunks(
+    doc_chunks: Sequence[Tuple[int, str]],
+    must_contain: str,
+) -> List[int]:
+    """chunk_index of every (chunk_index, text) pair that contains the answer."""
+    needle = normalize_for_match(must_contain)
+    return sorted(index for index, text in doc_chunks if needle in normalize_for_match(text))
+
+
+def reachability(results: Sequence[QuestionResult]) -> Dict:
+    """
+    How many answerable questions have their answer anywhere in the index.
+    This is the ceiling for every hit@k: an unreachable question can never hit.
+    """
+    checked = [r for r in results if r.answerable and r.reachable is not None]
+    unreachable = sorted(r.id for r in checked if not r.reachable)
+    return {
+        "n": len(checked),
+        "reachable": len(checked) - len(unreachable),
+        "rate": rate([bool(r.reachable) for r in checked]),
+        "unreachable_ids": unreachable,
+    }
 
 
 def hit_at_k(rank: Optional[int], k: int) -> bool:
@@ -189,6 +229,20 @@ def score_separation(results: Sequence[QuestionResult]) -> Dict:
             if max_unanswerable is not None and min_relevant is not None
             else None
         ),
+    }
+
+
+def score_separation_by_subtype(results: Sequence[QuestionResult]) -> Dict[str, Dict]:
+    """
+    score_separation per unanswerable subtype, each against the same
+    relevant-chunk scores from all answerable questions. Near-miss
+    questions are the ones that decide whether a threshold can work.
+    """
+    answerable = [r for r in results if r.answerable]
+    groups = group_by([r for r in results if not r.answerable], "subtype")
+    return {
+        subtype: score_separation([*answerable, *group])
+        for subtype, group in groups.items()
     }
 
 

@@ -12,6 +12,7 @@ import pytest
 from src.services.evaluation.metrics import (
     QuestionResult,
     RetrievedChunk,
+    find_answer_chunks,
     first_doc_rank,
     first_relevant_rank,
     group_by,
@@ -19,8 +20,10 @@ from src.services.evaluation.metrics import (
     is_relevant,
     normalize_for_match,
     percentile,
+    reachability,
     reciprocal_rank,
     score_separation,
+    score_separation_by_subtype,
     summarize,
 )
 from src.services.evaluation.run import (
@@ -39,17 +42,19 @@ def chunk(doc="a.pdf", text="", score=0.5, index=0):
     return RetrievedChunk(document_name=doc, chunk_index=index, score=score, text=text)
 
 
-def answerable(id="q1", doc="a.pdf", must_contain="needle", retrieved=(), type="direct", location="body"):
+def answerable(id="q1", doc="a.pdf", must_contain="needle", retrieved=(), type="direct",
+               location="body", answer_chunks=None):
     return QuestionResult(
         id=id, type=type, location=location, doc=doc,
         must_contain=must_contain, retrieved=list(retrieved),
+        answer_chunks=answer_chunks,
     )
 
 
-def unanswerable(id="u1", retrieved=()):
+def unanswerable(id="u1", retrieved=(), subtype=None):
     return QuestionResult(
         id=id, type="unanswerable", location=None, doc=None,
-        must_contain=None, retrieved=list(retrieved),
+        must_contain=None, retrieved=list(retrieved), subtype=subtype,
     )
 
 
@@ -288,3 +293,83 @@ def test_question_record_marks_every_relevant_chunk():
 def test_format_table_renders_missing_values():
     table = format_table("T", {"all": {"n": 2, "hit@1": None, "hit@3": 0.5}})
     assert "hit@1" in table and "-" in table and "0.50" in table
+
+
+# Answer reachability (experiment 0)
+def test_find_answer_chunks_uses_normalized_matching():
+    doc_chunks = [(4, "hay"), (0, "the data are right- skewed"), (7, "RIGHT-SKEWED again")]
+    assert find_answer_chunks(doc_chunks, "right-skewed") == [0, 7]
+
+
+def test_find_answer_chunks_none_found():
+    assert find_answer_chunks([(0, "hay")], "needle") == []
+    assert find_answer_chunks([], "needle") == []
+
+
+def test_reachable_property():
+    assert answerable(answer_chunks=None).reachable is None   # not checked
+    assert answerable(answer_chunks=[]).reachable is False
+    assert answerable(answer_chunks=[3]).reachable is True
+    assert unanswerable().reachable is None
+
+
+def test_reachability_summary():
+    results = [
+        answerable(id="ok", answer_chunks=[1]),
+        answerable(id="lost", answer_chunks=[]),
+        answerable(id="unchecked", answer_chunks=None),
+        unanswerable(),
+    ]
+    assert reachability(results) == {
+        "n": 2, "reachable": 1, "rate": 0.5, "unreachable_ids": ["lost"],
+    }
+
+
+def test_reachable_but_not_retrieved_is_a_ranking_miss():
+    # Answer exists in chunk 9 but retrieval returned other chunks.
+    r = answerable(retrieved=[chunk(text="hay")], answer_chunks=[9])
+    assert r.reachable is True and r.rank is None
+
+
+# Unanswerable subtypes
+def test_score_separation_by_subtype():
+    results = [
+        answerable(retrieved=[chunk(text="needle", score=0.65)]),
+        unanswerable(id="near", subtype="near_miss", retrieved=[chunk(score=0.77)]),
+        unanswerable(id="off", subtype="off_topic", retrieved=[chunk(score=0.40)]),
+        unanswerable(id="untagged", retrieved=[chunk(score=0.50)]),
+    ]
+
+    by_subtype = score_separation_by_subtype(results)
+
+    assert list(by_subtype) == ["near_miss", "none", "off_topic"]
+    # Every subtype is compared with the same relevant-chunk scores.
+    assert all(s["relevant_chunk_score_min"] == 0.65 for s in by_subtype.values())
+    assert by_subtype["near_miss"]["unanswerable_top1_max"] == 0.77
+    assert by_subtype["near_miss"]["clean_threshold_possible"] is False
+    assert by_subtype["off_topic"]["clean_threshold_possible"] is True
+    assert by_subtype["none"]["unanswerable_n"] == 1
+
+
+def test_score_separation_by_subtype_without_unanswerable():
+    assert score_separation_by_subtype([answerable(retrieved=[chunk(text="needle")])]) == {}
+
+
+def test_validate_question_subtype():
+    unans = dict(type="unanswerable", location=None, doc=None, must_contain=None)
+    assert validate_question(valid_row(**unans, subtype="near_miss")) == []
+    assert validate_question(valid_row(**unans, subtype="off_topic")) == []
+    assert validate_question(valid_row(**unans, subtype="trick"))
+    assert validate_question(valid_row(subtype="near_miss"))   # answerable can't have one
+
+
+def test_project_unanswerable_questions_are_all_tagged():
+    unanswerable_rows = [q for q in load_questions(DEFAULT_QUESTIONS) if q["type"] == "unanswerable"]
+    assert unanswerable_rows
+    assert all(q.get("subtype") in {"near_miss", "off_topic"} for q in unanswerable_rows)
+
+
+def test_question_record_includes_reachability():
+    record = question_record(answerable(retrieved=[chunk(text="needle")], answer_chunks=[0, 5]))
+    assert record["reachable"] is True
+    assert record["answer_chunks"] == [0, 5]

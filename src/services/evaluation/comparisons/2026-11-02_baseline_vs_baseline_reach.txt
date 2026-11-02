@@ -1,0 +1,36 @@
+Comparing  A: baseline (2026-11-02, git f8e21fa)
+       ->  B: baseline_reach (2026-11-02, git f8e21fa-dirty)
+
+Config differences
+  git: f8e21fa -> f8e21fa-dirty
+  questions: 49 -> 61
+
+Overall (answerable)
+  metric             A       B    delta
+  hit@1          0.432   0.432   +0.000
+  hit@3          0.682   0.682   +0.000
+  hit@5          0.795   0.795   +0.000
+  hit@10         0.886   0.886   +0.000
+  mrr@10         0.576   0.576   +0.000
+  doc_hit@3      0.909   0.909   +0.000
+
+Outcomes at k=3: 0 improved, 0 regressed, 0 rank changed, 44 unchanged
+
+Improved (miss -> hit at k=3) (0)
+  (none)
+
+Regressed (hit -> miss at k=3) (0)
+  (none)
+
+Rank changed, same outcome at k=3 (0)
+  (none)
+
+Unanswerable top-1 score, lower is better (5)
+  gen_q01    near_miss  0.692 -> 0.692  (+0.000)
+  gen_q02    near_miss  0.626 -> 0.626  (+0.000)
+  gen_q03    near_miss  0.665 -> 0.665  (+0.000)
+  gmm_q11    near_miss  0.772 -> 0.772  (+0.000)
+  oli_q10    near_miss  0.736 -> 0.736  (+0.000)
+
+Only in B (12): unk_q01, unk_q02, unk_q03, unk_q04, unk_q05, unk_q06, unk_q07, unk_q08, unk_q09, unk_q10, unk_q11, unk_q12
+The question sets differ, so the overall metrics are not directly comparable.
