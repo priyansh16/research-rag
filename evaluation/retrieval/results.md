@@ -11,6 +11,7 @@ Rates are over answerable questions (`n`). `mrr@10` and hit@k use chunk-level re
 | 2026-11-01 | pre_label_fix | 8c64add-dirty | cosine | off | 313 | 44 | 0.432 | 0.682 | 0.818 | 0.909 | 0.582 | 0.886 | 22.1 | 85.6 |
 | 2026-11-02 | baseline | f8e21fa | cosine | off | 313 | 44 | 0.432 | 0.682 | 0.795 | 0.886 | 0.576 | 0.909 | 22.6 | 77.7 |
 | 2026-11-02 | baseline_reach | f8e21fa-dirty | cosine | off | 313 | 44 | 0.432 | 0.682 | 0.795 | 0.886 | 0.576 | 0.909 | 23.2 | 80.2 |
+| 2026-11-02 | bge_prefix | 8b79464 | cosine | off | 313 | 44 | 0.409 | 0.705 | 0.750 | 0.909 | 0.561 | 0.909 | 21.6 | 76.8 |
 
 ## hit@3 by document
 
@@ -19,3 +20,4 @@ Rates are over answerable questions (`n`). `mrr@10` and hit@k use chunk-level re
 | 2026-11-01 | pre_label_fix | 0.750 | 0.889 | 0.667 | 0.400 | 0.750 |
 | 2026-11-02 | baseline | 0.750 | 0.889 | 0.667 | 0.400 | 0.750 |
 | 2026-11-02 | baseline_reach | 0.750 | 0.889 | 0.667 | 0.400 | 0.750 |
+| 2026-11-02 | bge_prefix | 0.750 | 0.889 | 0.667 | 0.400 | 0.875 |

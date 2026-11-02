@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from src.services.evaluation.summarize_results import (
+from evaluation.retrieval.summarize_results import (
     fmt_rerank,
     load_runs,
     main,

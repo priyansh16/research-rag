@@ -5,7 +5,7 @@ results.md is a generated file: it is rewritten from scratch on every
 call, never appended to. Keep hand-written observations in notes.md.
 
 Usage (from the repo root):
-    uv run python -m src.services.evaluation.summarize_results
+    uv run python -m evaluation.retrieval.summarize_results
 """
 
 import argparse

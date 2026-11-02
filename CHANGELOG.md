@@ -10,7 +10,7 @@ https://keepachangelog.com/en/1.1.0/
 ## [Unreleased]
 
 ### Added
-- Retrieval evaluation harness (`src/services/evaluation/run.py`): 61-question golden set over 5 papers
+- Retrieval evaluation harness (`evaluation/retrieval/run.py`): 61-question golden set over 5 papers
   (44 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
   17 unanswerable, tagged `near_miss` / `off_topic`), run directly against `RetrievalService`;
   reports hit@1/3/5/10, MRR@10 and doc_hit@3 overall and per type, location and document;

@@ -7,8 +7,8 @@ the hit@k line in each direction, which moved rank without crossing it,
 and how unanswerable questions' top scores shifted.
 
 Usage (from the repo root), with labels or file paths:
-    uv run python -m src.services.evaluation.compare_runs baseline bge-prefix
-    uv run python -m src.services.evaluation.compare_runs results/a.json results/b.json --k 5
+    uv run python -m evaluation.retrieval.compare_runs baseline bge-prefix
+    uv run python -m evaluation.retrieval.compare_runs evaluation/retrieval/results/a.json evaluation/retrieval/results/b.json --k 5
 """
 
 import argparse
@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from src.services.evaluation.metrics import hit_at_k
-from src.services.evaluation.summarize_results import (
+from evaluation.retrieval.metrics import hit_at_k
+from evaluation.retrieval.summarize_results import (
     DEFAULT_RESULTS_DIR,
     Run,
     parse_run,

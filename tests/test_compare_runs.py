@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from src.services.evaluation.compare_runs import (
+from evaluation.retrieval.compare_runs import (
     compare_questions,
     config_differences,
     format_comparison,

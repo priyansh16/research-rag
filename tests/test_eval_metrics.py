@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from src.services.evaluation.metrics import (
+from evaluation.retrieval.metrics import (
     QuestionResult,
     RetrievedChunk,
     find_answer_chunks,
@@ -26,7 +26,7 @@ from src.services.evaluation.metrics import (
     score_separation_by_subtype,
     summarize,
 )
-from src.services.evaluation.run import (
+from evaluation.retrieval.run import (
     DEFAULT_QUESTIONS,
     format_table,
     load_questions,

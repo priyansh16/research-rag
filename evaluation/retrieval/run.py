@@ -8,7 +8,7 @@ separately via their top similarity score, to inform a future
 "no relevant context" threshold.
 
 Usage (from the repo root):
-    uv run python -m src.services.evaluation.run --label baseline
+    uv run python -m evaluation.retrieval.run --label baseline
 """
 
 import argparse
@@ -24,7 +24,7 @@ from typing import Dict, List, Sequence, Tuple
 from loguru import logger
 
 from src.core.config import settings
-from src.services.evaluation.metrics import (
+from evaluation.retrieval.metrics import (
     QuestionResult,
     RetrievedChunk,
     find_answer_chunks,

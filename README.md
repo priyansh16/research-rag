@@ -176,17 +176,17 @@ run directly against `RetrievalService` with no HTTP and no LLM.
 | E2 | Neighbour dedup | | | | | Planned |
 
 Counts are out of 44 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
-Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](src/services/evaluation/EXPERIMENTS.md).
+Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
 
 ```bash
 # Run the evaluation (writes results/<date>_<label>.json)
-uv run python -m src.services.evaluation.run --label <label>
+uv run python -m evaluation.retrieval.run --label <label>
 
 # Compare two runs question by question
-uv run python -m src.services.evaluation.compare_runs <label_a> <label_b>
+uv run python -m evaluation.retrieval.compare_runs <label_a> <label_b>
 
 # Regenerate the results.md tables from all runs
-uv run python -m src.services.evaluation.summarize_results
+uv run python -m evaluation.retrieval.summarize_results
 ```
 
 ---
@@ -295,17 +295,6 @@ research-rag/
 │   ├── services/
 │   │   ├── embeddings/
 │   │   │   ├── embedding_service.py        # Embedding generation with retry logic and health probing
-│   │   ├── evaluation/
-│   │   │   ├── run.py                      # Retrieval evaluation harness: hit@k, MRR, reachability per run
-│   │   │   ├── metrics.py                  # Pure metric functions (relevance, ranks, hit@k, score separation)
-│   │   │   ├── compare_runs.py             # Question-by-question diff between two runs
-│   │   │   ├── summarize_results.py        # Regenerates results.md from all runs
-│   │   │   ├── questions.jsonl             # Golden question set (answerable + unanswerable)
-│   │   │   ├── EXPERIMENTS.md              # Experiment summary table and decisions
-│   │   │   ├── results.md                  # Generated tables for every run (do not edit)
-│   │   │   ├── notes.md                    # Working observations
-│   │   │   ├── results/                    # One JSON per run (<date>_<label>.json)
-│   │   │   ├── comparisons/                # Saved compare_runs outputs
 │   │   ├── ingestion/
 │   │   │   ├── ingestion_service.py        # Full ingestion pipeline.
 │   │   ├── parsers/
@@ -326,6 +315,17 @@ research-rag/
 │   │   ├── chunking.py         # chunking pipeline
 │   │   ├── document_service.py         # Manages all document-level persistence operations with health probe 
 │   ├── main.py                  # FastAPI app entry point
+├── evaluation/
+│   ├── retrieval/
+│   │   ├── run.py                  # Retrieval evaluation harness: hit@k, MRR, reachability per run
+│   │   ├── metrics.py              # Pure metric functions (relevance, ranks, hit@k, score separation)
+│   │   ├── compare_runs.py         # Question-by-question diff between two runs
+│   │   ├── summarize_results.py    # Regenerates results.md from all runs
+│   │   ├── questions.jsonl         # Golden question set (answerable + unanswerable)
+│   │   ├── EXPERIMENTS.md          # Experiment summary table and decisions
+│   │   ├── results.md              # Generated tables for every run (do not edit)
+│   │   ├── results/                # One JSON per run (<date>_<label>.json)
+│   │   ├── comparisons/            # Saved compare_runs outputs
 ├── tests/
 │   ├── data/                   # sample pdf file
 │   ├── conftest.py             #configures different services for whole test suites, like parsing, chunking etc.
