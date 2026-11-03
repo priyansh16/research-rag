@@ -292,4 +292,5 @@ Each experiment's hypothesis, setup, results and decision is recorded in
 
 - E0, answer reachability: 43/44 answers exist in an indexed chunk → ranking, not ingestion, is the bottleneck.
 - E1, BGE query prefix: not adopted, no effect (hit@3 30 → 31/44, one question).
+- E2, neighbour dedup: not adopted, tie at k=3; answers moved up consistently (hit@5 35 → 37), but dropping "duplicates" at query time also drops unique text (bic_q05) → fix overlap in chunking instead (E4, after the reranker in E3).
 - Learning: with 44 answerable questions, 1 question = 2.3 points, so ±1–2 questions is noise. Judge by the Improved/Regressed lists, not aggregate deltas.

@@ -28,12 +28,17 @@ def normalize_for_match(text: str) -> str:
     """
     Normalize text for substring matching only (never for display).
 
-    - NFKC turns ligatures into plain letters ("ﬁnite" -> "finite")
+    - NFKD turns ligatures into plain letters ("ﬁnite" -> "finite") and
+      splits accented letters into base letter + combining mark
+    - dropping combining marks folds accents, because OCR'd tables lose
+      them ("Växjö" in the PDF is stored as "Vaxjo")
     - casefold makes matching case-insensitive
     - dropping whitespace and dashes makes line-break hyphenation
       ("right- skewed", "member- ship") and spacing differences match
     """
-    return _IGNORED_CHARS.sub("", unicodedata.normalize("NFKC", text).casefold())
+    decomposed = unicodedata.normalize("NFKD", text)
+    unaccented = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return _IGNORED_CHARS.sub("", unaccented.casefold())
 
 
 @dataclass(frozen=True)

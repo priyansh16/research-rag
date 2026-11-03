@@ -69,6 +69,9 @@ def unanswerable(id="u1", retrieved=(), subtype=None):
         ("the 2021–2022 NHL season", "2021-2022 nhl"),      # en dash vs hyphen
         ("length  13\nfor defenders", "length 13 for defenders"),  # whitespace
         ("a total of 15,360 models", "15,360"),             # punctuation kept
+        ("17/18 Vaxjo (1, champions)", "växjö (1, champions)"),  # accents lost by OCR
+        ("Anton Strålman", "anton stralman"),               # accents in label only
+        ("Lucas Ekeståhl-Jonsson", "ekeståhl-jonsson"),     # accents on both sides
     ],
 )
 def test_normalize_for_match_handles_pdf_artifacts(chunk_text, must_contain):

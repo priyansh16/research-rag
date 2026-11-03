@@ -173,7 +173,9 @@ run directly against `RetrievalService` with no HTTP and no LLM.
 | — | Baseline | 19 | **30** | 35 | 0.576 | Reference |
 | E0 | Answer reachability | — | — | — | — | Diagnostic: 43/44 answers reachable |
 | E1 | BGE query prefix | 18 | **31** | 33 | 0.561 | Not adopted, no effect |
-| E2 | Neighbour dedup | | | | | Planned |
+| E2 | Neighbour dedup (window 1) | 19 | **30** | 37 | 0.592 | Not adopted: tie at k=3, +2 at k=5 |
+| E3 | Cross-encoder reranker | | | | | Planned |
+| E4 | Chunking overlap fix | | | | | Planned |
 
 Counts are out of 44 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
 Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
