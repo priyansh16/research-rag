@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     OVERLAP_ELEMENTS:int = 2
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     TOP_K_RESULTS:int =  3
+    # Cross-encoder that re-orders the vector-search candidates
+    # (e.g. "BAAI/bge-reranker-base"). Empty = reranking off.
+    RETRIEVAL_RERANKER_MODEL: str = ""
+    # How many vector-search candidates the reranker re-scores.
+    RETRIEVAL_RERANK_CANDIDATES: int = 20
     CHROMA_COLLECTION_NAME: str = "research_documents"
     CHROMA_DB_DIR:str = "./chroma_db"
     HEALTH_PROBE_TEXT: str = "health check"
