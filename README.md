@@ -168,16 +168,17 @@ Grounded Response
 A hand-labelled set of 96 questions over the 5 indexed papers (79 answerable, 17 unanswerable),
 run directly against `RetrievalService` with no HTTP and no LLM.
 
-| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | Verdict |
-|---|---|---|---|---|---|---|---|
-| — | Baseline v2 | 37 | **52** | 59 | 66 | 0.583 | Reference |
-| E0 | Answer reachability | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
-| E1 | BGE query prefix | | | | | | Not adopted, no effect (v1 set only) |
-| E2 | Neighbour dedup (window 1) | 37 | **54** | 62 | 68 | 0.597 | Held: +2 at k=3, re-test with E3 |
-| E3 | Cross-encoder reranker | | | | | | Planned |
-| E4 | Chunking overlap fix | | | | | | Planned |
+| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | p50 ms | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| — | Baseline v2 (vector search only) | 37 | **52** | 59 | 66 | 0.583 | 21 | Reference for E2, E3 |
+| E0 | Answer reachability | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
+| E1 | BGE query prefix | | | | | | | Not adopted, no effect (v1 set only) |
+| E3 | **Reranker: MiniLM-L-6, 15 candidates** | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted** (bge-reranker-base: 6 regressions, 3× slower) |
+| E2 | Reranker + neighbour dedup (window 1) | 55 | **64** | 67 | 69 | 0.760 | 228 | +2, 0 regressions; merged off, decide after E4 |
+| E4 | Chunking overlap fix | | | | | | | Planned |
 
 Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+The cross-encoder reranker lifted hit@3 from 52 to 62 and hit@1 from 37 to 55, at ~210 ms extra per query on CPU.
 Results on the earlier 61-question set are kept in EXPERIMENTS.md.
 Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
 

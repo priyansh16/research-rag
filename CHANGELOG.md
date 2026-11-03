@@ -21,7 +21,14 @@ https://keepachangelog.com/en/1.1.0/
 - `compare_runs.py`: question-by-question diff between two runs (improved, regressed, rank changes,
   config differences, unanswerable score shifts).
 - `summarize_results.py`: regenerates `results.md` tables from every run in `results/`.
-- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted; E2 neighbour dedup, w1 held for a combined run with the reranker).
+- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted; E2 neighbour dedup, merged off; E3 reranker, adopted).
+- Cross-encoder reranking in `RetrievalService.search()` (`RerankerService`, `src/services/retrieval/reranker_service.py`):
+  re-scores the top `RETRIEVAL_RERANK_CANDIDATES` (default 15) vector-search chunks with `RETRIEVAL_RERANKER_MODEL`
+  (default `cross-encoder/ms-marco-MiniLM-L-6-v2`; empty = off). Results carry the reranker `score` and the original
+  `vector_score`. Eval: hit@3 52 → 62 of 79, hit@1 37 → 55; p50 retrieval latency 21 → 231 ms on CPU.
+- Optional neighbour-chunk dropping (`RETRIEVAL_NEIGHBOR_WINDOW`, default 0 = off): skips chunks within ±N positions of a
+  higher-ranked chunk from the same document, applied after reranking.
+- Evaluation run metadata records `rerank`, `rerank_candidates` and `neighbor_window`.
 - `RetrievalService.search()` accepts an optional `top_k` (defaults to `settings.TOP_K_RESULTS`, rejects values < 1), so callers like the evaluation harness can request k per call without mutating global settings.
 - Ingest log now reports `submitted` vs actually `stored` chunk counts and warns on partial indexing.
 - Test suite grew from 28 to 129 tests (127 fast, 2 `e2e`).
@@ -29,6 +36,9 @@ https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Retrieval now reranks by default: the app downloads the MiniLM cross-encoder (~90 MB) on first start, and the
+  returned `score` is a cross-encoder logit (unbounded), not cosine similarity. Set `RETRIEVAL_RERANKER_MODEL=""` for
+  vector-only retrieval.
 - Evaluation `must_contain` matching folds accents (NFKD, combining marks dropped), because OCR'd tables lose diacritics ("Växjö" is stored as "Vaxjo").
 - Chroma collection now created with `hnsw:space: cosine` (was default squared L2), so retrieval `score` is true cosine similarity instead of `2·cos − 1`. Rankings are unchanged; applies only to newly created collections.
 

@@ -2,16 +2,21 @@
 
 ## Current question set (v2: 96 questions, 79 answerable)
 
-| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | Verdict |
-|---|---|---|---|---|---|---|---|
-| — | [Baseline v2](#baseline-v2) | 37 | **52** | 59 | 66 | 0.583 | Reference |
-| E0 | [Answer reachability](#e0-answer-reachability) | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
-| E2 | [Neighbour dedup](#e2-neighbour-dedup) (window 1) | 37 | **54** | 62 | 68 | 0.597 | Held: +2 at k=3, re-test combined with E3 |
-| E2 | [Neighbour dedup](#e2-neighbour-dedup) (window 2) | 37 | **53** | 61 | 66 | 0.589 | Not adopted: drops more unique text than w1 |
-| E3 | [Cross-encoder reranker](#e3-cross-encoder-reranker) | | | | | | Planned |
-| E4 | [Chunking overlap fix](#e4-chunking-overlap-fix) | | | | | | Planned |
+| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | p50 ms | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| — | [Baseline v2](#baseline-v2) (no reranker) | 37 | **52** | 59 | 66 | 0.583 | 21 | Reference for E2, E3 |
+| E0 | [Answer reachability](#e0-answer-reachability) | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
+| E2 | [Neighbour dedup](#e2-neighbour-dedup) w1 | 37 | **54** | 62 | 68 | 0.597 | — | +2 at k=3 (3 up, 1 down) |
+| E2 | Neighbour dedup w2 | 37 | **53** | 61 | 66 | 0.589 | — | Not adopted: 3 regressions |
+| E3 | [Reranker](#e3-cross-encoder-reranker) bge-reranker-base, 20 cand. | 50 | **60** | 65 | 68 | 0.715 | 941 | Not adopted: 6 regressions, 3× slower |
+| E3 | Reranker MiniLM-L-6, 20 cand. | 55 | **61** | 65 | 71 | 0.755 | 301 | +9 at k=3, 0 regressions |
+| E3 | Reranker MiniLM-L-6, 30 cand. | 56 | **62** | 65 | 71 | 0.763 | 434 | Same quality, too slow |
+| E3 | **Reranker MiniLM-L-6, 15 cand.** (`rerank_minilm_c15`) | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted, default.** Current reference |
+| E2+E3 | Reranker c15 + neighbour dedup w1 | 55 | **64** | 67 | 69 | 0.760 | 228 | +2 vs c15, 0 regressions. Merged **off**; decide in E4 |
+| E4 | [Chunking overlap fix](#e4-chunking-overlap-fix) | | | | | | | Planned |
 
 Counts are out of 79 answerable questions; 1 question = 1.3 points, so ±1 question is within noise.
+Latency is p50 of `search()` on a laptop CPU after warm-up (embedding + Chroma + reranking).
 Judge by the Improved/Regressed lists in `comparisons/`, not by aggregate deltas.
 hit@3 is the headline metric because the app sends 3 chunks to the LLM; this may move to hit@5 if `top_k` changes.
 
@@ -69,17 +74,48 @@ v1 and v2 numbers are not comparable with each other. E1 was not re-run on v2 (o
   - hit@1 and unanswerable top-1 scores unchanged by design: the top chunk is never dropped.
 - **Failure mode:** bic_q05's answer is in chunks 44–45, next to a higher-ranked chunk 43 without it, so the answer
   chunks were dropped as "duplicates". Query-time dropping can't tell overlapping text from new text; a wider window drops more.
-- **Decision:** w2 not adopted. w1 held (not merged, off by default): a small consistent gain, but it works around
-  overlap that E4 fixes at ingest. Re-test w1 on top of the reranker in E3; merge only if the combination beats the reranker alone.
-- **Evidence:** `comparisons/2026-11-03_baseline_v2_vs_neighbor_w1_v2.txt`, `..._vs_neighbor_w2_v2.txt`
+- **Result (v2, on top of the E3 reranker, 15 candidates):** w1 hit@3 62 → 64 (2 improved: bic_q06, oli_q14, both
+  rank 4 → 3; 0 regressed), hit@5 +1, hit@10 −1, no latency cost. The reranker scores near-identical overlapping
+  chunks near-identically, so it can't remove duplicates itself; dedup does. Dedup runs on the reranked pool
+  (pool stays at 15), so it can return fewer than 10 results, which slightly understates hit@10.
+- **Failure mode:** bic_q05's answer is in chunks 44–45, next to a higher-ranked chunk 43 without it, so the answer
+  chunks were dropped as "duplicates". Query-time dropping can't tell overlapping text from new text; a wider window drops more.
+  Still present with the reranker: bic_q14 (rank 5 → out).
+- **Decision:** w2 not adopted. w1 cleared the bar (+2, 0 regressions, three consistent runs) and is **merged into
+  `feat/evaluation` but off by default** (`RETRIEVAL_NEIGHBOR_WINDOW = 0`): it works around chunk overlap, which E4
+  removes at ingest, so the gain may disappear. E4 is measured with w0 and w1; switch it on only if it still helps.
+- **Evidence:** `comparisons/2026-11-03_rerank_c15_vs_rerank_c15_neighbor_w1.txt`,
+  `comparisons/2026-11-03_baseline_v2_vs_neighbor_w1_v2.txt`, `..._vs_neighbor_w2_v2.txt`
   (v1: `comparisons/2026-11-02_baseline_reach_vs_neighbor_w1.txt`, `..._vs_neighbor_w2.txt`)
 
 ## E3: Cross-encoder reranker
 
-- **Hypothesis:** most misses rank 4–10; re-scoring the top ~20 with a cross-encoder moves answer chunks into the top 3.
-- **Change:** query-time only, no re-ingest. Branch `exp/eval_reranker`. Also run reranker + neighbour dedup w1.
+- **Hypothesis:** most misses rank 4–10; re-scoring a candidate pool with a cross-encoder moves answer chunks into the top 3.
+- **Change:** `RETRIEVAL_RERANKER_MODEL` re-scores the top `RETRIEVAL_RERANK_CANDIDATES` vector-search chunks with a
+  `sentence_transformers.CrossEncoder` and keeps top_k. Query-time only, no re-ingest. Branch `exp/eval_reranker`.
+- **Result (models, 20 candidates, vs baseline_v2):**
+  - MiniLM-L-6 (`cross-encoder/ms-marco-MiniLM-L-6-v2`, 22M): hit@3 52 → 61 (9 improved, **0 regressed**), hit@1 37 → 55,
+    hit@10 66 → 71, MRR 0.583 → 0.755.
+  - bge-reranker-base (278M): hit@3 52 → 60 (14 improved, **6 regressed**, incl. direct facts at rank 1 such as
+    ras_q03, ras_q09 → rank 4). Scored off-topic questions near 1.0 against noisy number tables
+    (unk_q10 "Zuckerberg's net worth" 0.995 on a GMM_BIC parameter table).
+  - Biggest gains on LINHAC_2025 tables (gmm_q05/06/12/16/17 to rank 1–2): the cross-encoder reads query and
+    OCR'd table together, where separate embeddings match poorly.
+- **Result (pool size, MiniLM):** hit@3 15 / 20 / 30 candidates = 62 / 61 / 62; p50 231 / 301 / 434 ms. Flat: each
+  size wins one question and loses another (30 rescues oli_q04 from vector rank 21–30; 15 avoids a distractor at 16–20
+  that outranked bic_q10). 15 chosen on a tie, for latency.
+- **Unanswerable:** reranker scores are unbounded logits (≈ −11 to +5), not cosine. Off-topic questions fall to ≈ −10,
+  but near-miss questions (−10.6 … +3.1) still overlap relevant chunks (min −10.4): no clean threshold. Refusal stays a
+  generation-side job.
+- **Decision:** adopted. MiniLM-L-6 with 15 candidates is the default. `rerank_minilm_c15` is the reference run.
+- **Caveats:** pool size depends on the corpus (answers can sit at vector rank 21–30 already); re-check after E4 and
+  when papers are added. Pool size was chosen on the evaluation set, so it's recorded as "chosen on a tie", not "better".
+  p95 is 340 ms; long chunks (up to 3,447 chars) cost the most, which E4's size cap should reduce.
+- **Evidence:** `comparisons/2026-11-03_baseline_v2_vs_rerank_minilm.txt`, `..._vs_rerank_bge_base.txt`,
+  `comparisons/2026-11-03_rerank_minilm_vs_c15.txt`, `..._vs_c30.txt`
 
 ## E4: Chunking overlap fix
 
 - **Hypothesis:** chunks that don't repeat each other's text stop crowding the top 3, without dropping unique content as E2 did.
 - **Change:** smaller overlap, split oversized elements, cap chunk size. Needs a re-ingest into a new collection.
+  Measured with the reranker on (the default), with neighbour dedup w0 and w1, against `rerank_minilm_c15`.

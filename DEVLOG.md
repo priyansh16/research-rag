@@ -292,7 +292,7 @@ Each experiment's hypothesis, setup, results and decision is recorded in
 
 - E0, answer reachability: 43/44 answers exist in an indexed chunk → ranking, not ingestion, is the bottleneck.
 - E1, BGE query prefix: not adopted, no effect (hit@3 30 → 31/44, one question).
-- E2, neighbour dedup: not adopted, tie at k=3; answers moved up consistently (hit@5 35 → 37), but dropping "duplicates" at query time also drops unique text (bic_q05) → fix overlap in chunking instead (E4, after the reranker in E3).
+- E2, neighbour dedup (v1 set): tie at k=3; answers moved up consistently (hit@5 35 → 37), but dropping "duplicates" at query time also drops unique text (bic_q05). See the v2 and E3 entries below for the later results.
 - Learning: with 44 answerable questions, 1 question = 2.3 points, so ±1–2 questions is noise. Judge by the Improved/Regressed lists, not aggregate deltas.
 
 ### Question set v2 (2026-11-03)
@@ -302,3 +302,16 @@ Each experiment's hypothesis, setup, results and decision is recorded in
   ("Frölunda" → "Frélunda", "1st" → "Ist"). `normalize_for_match` now folds accents; garbled OCR can't be matched.
 - E2 re-run: w1 hit@3 +2 (3 improved, 1 regressed), hit@5 +3; w2 +1 with 3 regressions. w1 held for a combined run with the reranker (E3).
 - Learning: experiment branches must merge `feat/evaluation` before re-running, not just copy `questions.jsonl`; otherwise tooling fixes (like accent folding) are missing and show up as false regressions, and copied files make the run `-dirty`.
+
+### E3 reranker, E2 combined (2026-11-03)
+- E3 adopted: cross-encoder `ms-marco-MiniLM-L-6-v2` re-scores 15 vector candidates. hit@3 52 → 62, hit@1 37 → 55, 0 regressions; p50 21 → 231 ms.
+- bge-reranker-base lost despite being 12× bigger: 6 regressions (direct facts pushed from rank 1 to 4) and near-1.0 scores for off-topic
+  questions against noisy number tables. Bigger reranker ≠ better on OCR-heavy academic text.
+- Biggest gains on tables: the cross-encoder reads query + OCR'd table together; separate embeddings of a number grid match poorly.
+- Pool size 15/20/30 gave hit@3 62/61/62 — flat; 15 chosen on a tie for latency. Answers can already sit at vector rank 21–30,
+  so revisit pool size when the corpus grows.
+- E2 dedup w1 on top of the reranker: +2 hit@3, 0 regressions, free. The reranker gives overlapping near-duplicates near-identical
+  scores, so it can't dedupe itself. Merged off by default: E4 removes overlap at ingest and may make it redundant.
+- Still no score threshold for near-miss unanswerable questions, on cosine or reranker scores → refusal belongs in generation.
+- Learning: when two experiments touch the same function, merge the winner into `feat/evaluation` first, then merge
+  `feat/evaluation` into the other branch, resolve once, and compare against the new reference (not the old baseline).
