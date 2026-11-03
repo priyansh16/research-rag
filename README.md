@@ -142,7 +142,7 @@ Grounded Response
 - FastAPI dependency injection with application-scoped service
   lifecycle (one shared instance per service, built once at startup)
 - Retrieval evaluation harness: hit@k, MRR and answer reachability on a
-  61-question golden set, with run-to-run comparison per question
+  96-question golden set, with run-to-run comparison per question
 - 129 automated tests covering ingestion, retrieval, prompt building,
   guardrails, generation, evaluation metrics, and real API/DI wiring
   end-to-end, split into a fast per-commit suite (127) and a scheduled
@@ -165,19 +165,20 @@ Grounded Response
 
 ## Retrieval Evaluation
 
-A hand-labelled set of 61 questions over the 5 indexed papers (44 answerable, 17 unanswerable),
+A hand-labelled set of 96 questions over the 5 indexed papers (79 answerable, 17 unanswerable),
 run directly against `RetrievalService` with no HTTP and no LLM.
 
-| # | Experiment | hit@1 | hit@3 | hit@5 | MRR@10 | Verdict |
-|---|---|---|---|---|---|---|
-| — | Baseline | 19 | **30** | 35 | 0.576 | Reference |
-| E0 | Answer reachability | — | — | — | — | Diagnostic: 43/44 answers reachable |
-| E1 | BGE query prefix | 18 | **31** | 33 | 0.561 | Not adopted, no effect |
-| E2 | Neighbour dedup (window 1) | 19 | **30** | 37 | 0.592 | Not adopted: tie at k=3, +2 at k=5 |
-| E3 | Cross-encoder reranker | | | | | Planned |
-| E4 | Chunking overlap fix | | | | | Planned |
+| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | Verdict |
+|---|---|---|---|---|---|---|---|
+| — | Baseline v2 | 37 | **52** | 59 | 66 | 0.583 | Reference |
+| E0 | Answer reachability | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
+| E1 | BGE query prefix | | | | | | Not adopted, no effect (v1 set only) |
+| E2 | Neighbour dedup (window 1) | 37 | **54** | 62 | 68 | 0.597 | Held: +2 at k=3, re-test with E3 |
+| E3 | Cross-encoder reranker | | | | | | Planned |
+| E4 | Chunking overlap fix | | | | | | Planned |
 
-Counts are out of 44 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+Results on the earlier 61-question set are kept in EXPERIMENTS.md.
 Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
 
 ```bash

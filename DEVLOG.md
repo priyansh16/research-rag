@@ -294,3 +294,11 @@ Each experiment's hypothesis, setup, results and decision is recorded in
 - E1, BGE query prefix: not adopted, no effect (hit@3 30 → 31/44, one question).
 - E2, neighbour dedup: not adopted, tie at k=3; answers moved up consistently (hit@5 35 → 37), but dropping "duplicates" at query time also drops unique text (bic_q05) → fix overlap in chunking instead (E4, after the reranker in E3).
 - Learning: with 44 answerable questions, 1 question = 2.3 points, so ±1–2 questions is noise. Judge by the Improved/Regressed lists, not aggregate deltas.
+
+### Question set v2 (2026-11-03)
+- Grew the set to 96 questions (79 answerable), written from the PDFs; more paraphrased and table questions.
+- baseline_v2: hit@3 52/79 (0.66), hit@10 66/79; 14 of 27 misses rank 4–10. Weakest: tables 0.46, paraphrased 0.56, LINHAC_2025 0.39.
+- Found while labelling: tables are stored as OCR text that drops diacritics ("Växjö" → "Vaxjo") and garbles some words
+  ("Frölunda" → "Frélunda", "1st" → "Ist"). `normalize_for_match` now folds accents; garbled OCR can't be matched.
+- E2 re-run: w1 hit@3 +2 (3 improved, 1 regressed), hit@5 +3; w2 +1 with 3 regressions. w1 held for a combined run with the reranker (E3).
+- Learning: experiment branches must merge `feat/evaluation` before re-running, not just copy `questions.jsonl`; otherwise tooling fixes (like accent folding) are missing and show up as false regressions, and copied files make the run `-dirty`.

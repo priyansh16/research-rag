@@ -180,12 +180,14 @@ def build_services():
     from src.services.embeddings.embedding_service import EmbeddingService
     from src.services.vectorstore.chroma_service import ChromaService
     from src.services.retrieval.retrieval_service import RetrievalService
+    from src.services.retrieval.reranker_service import build_reranker_service
 
     embedding_service = EmbeddingService()
     chroma_service = ChromaService()
     retrieval_service = RetrievalService(
         embedding_service=embedding_service,
         chroma_service=chroma_service,
+        reranker_service=build_reranker_service(),
     )
     return chroma_service, retrieval_service
 
@@ -342,6 +344,9 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
 
     print(f"\nRetrieval evaluation: {meta['label']}  ({meta['timestamp']}, git {meta['git']})")
     print(f"  model:      {meta['embedding_model']} | neighbor_window={meta['neighbor_window']}")
+    if meta.get("rerank"):
+        print(f"  rerank:     {meta['rerank']} (top {meta['rerank_candidates']} candidates; "
+              f"scores below are reranker scores, not cosine)")
     print(f"  collection: {meta['collection']} | metric={meta['distance_metric']} | chunks={meta['indexed_chunks']}")
     print(f"  questions:  {meta['questions']} ({len(answerable)} answerable, "
           f"{meta['questions'] - len(answerable)} unanswerable) | app top_k={doc_k}\n")
@@ -426,6 +431,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "git": git_revision(),
         "embedding_model": settings.EMBEDDING_MODEL,
         "neighbor_window": settings.RETRIEVAL_NEIGHBOR_WINDOW or None,
+        "rerank": settings.RETRIEVAL_RERANKER_MODEL or None,
+        "rerank_candidates": settings.RETRIEVAL_RERANK_CANDIDATES if settings.RETRIEVAL_RERANKER_MODEL else None,
         "collection": settings.CHROMA_COLLECTION_NAME,
         "distance_metric": collection_metadata.get("hnsw:space", "l2 (default)"),
         "indexed_chunks": sum(chunk_counts.values()),

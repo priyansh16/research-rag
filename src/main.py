@@ -13,6 +13,7 @@ from src.routers import health, documents, retrieval, generation
 from src.services.embeddings.embedding_service import EmbeddingService
 from src.services.vectorstore.chroma_service import ChromaService
 from src.services.retrieval.retrieval_service import RetrievalService
+from src.services.retrieval.reranker_service import build_reranker_service
 from src.services.guardrails.guardrails_service import GuardrailsService
 from src.services.generation.ollama_client import OllamaClient
 from src.services.generation.generation_service import GenerationService
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     retrieval_service = RetrievalService(
         embedding_service=embedding_service,
         chroma_service=chroma_service,
+        reranker_service=build_reranker_service(),
     )
     
     logger.info("Initializing GuardrailsService...")

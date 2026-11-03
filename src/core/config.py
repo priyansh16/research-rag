@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # Drop chunks within ±N positions of a higher-ranked chunk from the same
     # document (overlapping chunks are near-duplicates). 0 = off.
     RETRIEVAL_NEIGHBOR_WINDOW: int = 0
+    # Cross-encoder that re-orders the vector-search candidates.
+    # Adopted in E3: MiniLM beat bge-reranker-base (+9 hit@3, 0 regressions, 3x faster).
+    # Empty = reranking off.
+    RETRIEVAL_RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    # How many vector-search candidates the reranker re-scores.
+    # 15 vs 20: same quality (hit@3 +1, 0 regressions), p50 latency 301 -> 231 ms.
+    RETRIEVAL_RERANK_CANDIDATES: int = 15
     CHROMA_COLLECTION_NAME: str = "research_documents"
     CHROMA_DB_DIR:str = "./chroma_db"
     HEALTH_PROBE_TEXT: str = "health check"
