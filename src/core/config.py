@@ -22,9 +22,10 @@ class Settings(BaseSettings):
     OVERLAP_ELEMENTS:int = 2
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     TOP_K_RESULTS:int =  3
-    # Cross-encoder that re-orders the vector-search candidates
-    # (e.g. "BAAI/bge-reranker-base"). Empty = reranking off.
-    RETRIEVAL_RERANKER_MODEL: str = ""
+    # Cross-encoder that re-orders the vector-search candidates.
+    # Adopted in E3: MiniLM beat bge-reranker-base (+9 hit@3, 0 regressions, 3x faster).
+    # Empty = reranking off.
+    RETRIEVAL_RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # How many vector-search candidates the reranker re-scores.
     RETRIEVAL_RERANK_CANDIDATES: int = 20
     CHROMA_COLLECTION_NAME: str = "research_documents"

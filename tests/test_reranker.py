@@ -97,7 +97,7 @@ def test_rerank_empty_results_skips_model():
     assert model.calls == []
 
 
-def test_build_reranker_service_off_by_default(monkeypatch):
+def test_build_reranker_service_none_when_model_empty(monkeypatch):
     monkeypatch.setattr(settings, "RETRIEVAL_RERANKER_MODEL", "")
     assert build_reranker_service() is None
 
