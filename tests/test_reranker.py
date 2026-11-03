@@ -47,7 +47,7 @@ class FakeChromaService:
         n = min(top_k, self.n_stored)
         return {
             "documents": [[f"c{i}" for i in range(n)]],
-            "metadatas": [[{"chunk_index": i} for i in range(n)]],
+            "metadatas": [[{"document_id": 1, "chunk_index": i} for i in range(n)]],
             "distances": [[i / 100 for i in range(n)]],
         }
 
@@ -145,6 +145,21 @@ def test_search_with_reranker_pool_never_smaller_than_k(monkeypatch):
 
     assert chroma.requested_top_k == 10
     assert len(results) == 10
+
+
+def test_search_with_reranker_drops_neighbors_in_reranked_order(monkeypatch):
+    monkeypatch.setattr(settings, "RETRIEVAL_RERANK_CANDIDATES", 15)
+    monkeypatch.setattr(settings, "RETRIEVAL_NEIGHBOR_WINDOW", 1)
+    # Reranker prefers later chunks: reranked order is c14, c13, c12, ...
+    model = FakeCrossEncoder({f"c{i}": i / 100 for i in range(30)})
+    service, chroma = make_service(RerankerService("fake", model=model))
+
+    results = service.search("q", top_k=3)
+
+    # Pool stays the reranker's, not k * (2*window + 1).
+    assert chroma.requested_top_k == 15
+    # Neighbours of kept chunks are dropped after reranking: 13 and 11 go.
+    assert [x["chunks"] for x in results] == ["c14", "c12", "c10"]
 
 
 def test_search_with_reranker_fewer_stored_than_pool(monkeypatch):
