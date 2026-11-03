@@ -10,8 +10,8 @@ https://keepachangelog.com/en/1.1.0/
 ## [Unreleased]
 
 ### Added
-- Retrieval evaluation harness (`evaluation/retrieval/run.py`): 61-question golden set over 5 papers
-  (44 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
+- Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers
+  (79 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
   17 unanswerable, tagged `near_miss` / `off_topic`), run directly against `RetrievalService`;
   reports hit@1/3/5/10, MRR@10 and doc_hit@3 overall and per type, location and document;
   records git commit, embedding model, distance metric and chunk counts per run.
@@ -21,7 +21,7 @@ https://keepachangelog.com/en/1.1.0/
 - `compare_runs.py`: question-by-question diff between two runs (improved, regressed, rank changes,
   config differences, unanswerable score shifts).
 - `summarize_results.py`: regenerates `results.md` tables from every run in `results/`.
-- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted).
+- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted; E2 neighbour dedup, w1 held for a combined run with the reranker).
 - `RetrievalService.search()` accepts an optional `top_k` (defaults to `settings.TOP_K_RESULTS`, rejects values < 1), so callers like the evaluation harness can request k per call without mutating global settings.
 - Ingest log now reports `submitted` vs actually `stored` chunk counts and warns on partial indexing.
 - Test suite grew from 28 to 129 tests (127 fast, 2 `e2e`).
@@ -29,6 +29,7 @@ https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Evaluation `must_contain` matching folds accents (NFKD, combining marks dropped), because OCR'd tables lose diacritics ("Växjö" is stored as "Vaxjo").
 - Chroma collection now created with `hnsw:space: cosine` (was default squared L2), so retrieval `score` is true cosine similarity instead of `2·cos − 1`. Rankings are unchanged; applies only to newly created collections.
 
 ### Fixed
