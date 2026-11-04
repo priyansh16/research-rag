@@ -16,10 +16,25 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     DATABASE_PATH:str = "./rag.db"
     PARSER_BACKEND: str = "unstructured"
+    # Where table text comes from (unstructured backend):
+    # "ocr" = unstructured's OCR'd cells, flattened (old behaviour);
+    # "text_layer" = rebuilt from the PDF text layer, one row per line,
+    # falling back to OCR per table when the region has no text layer.
+    TABLE_TEXT_SOURCE: str = "ocr"
 
     # --- Retrieval -----
     MAX_CHUNK_SIZE: int =  1200
     OVERLAP_ELEMENTS:int = 2
+    # Cap on the characters carried over as overlap into the next chunk.
+    # 0 = no cap (old behaviour: the last OVERLAP_ELEMENTS elements are
+    # always carried, however long). When > 0, only trailing elements that
+    # fit under the cap are carried, and overlap is dropped if it would push
+    # the next chunk over MAX_CHUNK_SIZE.
+    CHUNK_OVERLAP_MAX_CHARS: int = 0
+    # Split elements longer than MAX_CHUNK_SIZE at sentence boundaries
+    # (word boundaries when there are none, e.g. OCR'd tables). False = old
+    # behaviour: an oversized element becomes an oversized chunk.
+    CHUNK_SPLIT_LONG_ELEMENTS: bool = False
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     TOP_K_RESULTS:int =  3
     # Drop chunks within ±N positions of a higher-ranked chunk from the same
