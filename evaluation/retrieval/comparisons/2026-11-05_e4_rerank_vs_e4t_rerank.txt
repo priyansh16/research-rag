@@ -1,0 +1,53 @@
+Comparing  A: e4_rerank (2026-11-05, git 28601ea)
+       ->  B: e4t_rerank (2026-11-05, git 28601ea-dirty)
+
+Config differences
+  chunk_chars: {'mean': 978, 'p95': 1203, 'max': 1279, 'limit': 1200, 'o... -> {'mean': 976, 'p95': 1201, 'max': 1245, 'limit': 1200, 'o...
+  chunks_per_doc: {'GMM_BIC.pdf': 64, 'LINHAC_2022_Erik.pdf': 21, 'LINHAC_2... -> {'GMM_BIC.pdf': 66, 'LINHAC_2022_Erik.pdf': 21, 'LINHAC_2...
+  collection: research_documents_e4 -> research_documents_e4t
+  git: 28601ea -> 28601ea-dirty
+  indexed_chunks: 202 -> 205
+
+Overall (answerable)
+  metric             A       B    delta
+  hit@1          0.646   0.633   -0.013
+  hit@3          0.709   0.709   +0.000
+  hit@5          0.759   0.747   -0.013
+  hit@10         0.823   0.823   +0.000
+  mrr@10         0.696   0.686   -0.010
+  doc_hit@3      0.911   0.924   +0.013
+
+Outcomes at k=3: 3 improved, 3 regressed, 2 rank changed, 71 unchanged
+
+Improved (miss -> hit at k=3) (3)
+  gmm_q04    direct/body        LINHAC_2025.pdf          rank  - -> 2
+  ras_q11    direct/body        MLSA23-RASMAS.pdf        rank  - -> 1
+  bic_q06    paraphrased/body   GMM_BIC.pdf              rank  4 -> 3
+
+Regressed (hit -> miss at k=3) (3)
+  gmm_q06    direct/table       LINHAC_2025.pdf          rank  1 -> -
+  gmm_q12    direct/table       LINHAC_2025.pdf          rank  1 -> -
+  gmm_q17    direct/table       LINHAC_2025.pdf          rank  2 -> -
+
+Rank changed, same outcome at k=3 (2)
+  bic_q10    paraphrased/body   GMM_BIC.pdf              rank  - -> 7
+  bic_q12    paraphrased/body   GMM_BIC.pdf              rank  8 -> 9
+
+Unanswerable top-1 score, lower is better (17)
+  unk_q09    off_topic  -9.550 -> -9.352  (+0.198)
+  gen_q01    near_miss  -0.511 -> -0.511  (+0.000)
+  gen_q02    near_miss  -1.120 -> -1.120  (+0.000)
+  gen_q03    near_miss  -10.884 -> -10.884  (+0.000)
+  gmm_q11    near_miss  -0.801 -> -0.801  (+0.000)
+  unk_q01    near_miss  -1.415 -> -1.415  (+0.000)
+  unk_q02    near_miss  0.526 -> 0.526  (+0.000)
+  unk_q03    near_miss  2.020 -> 2.020  (+0.000)
+  unk_q04    near_miss  -9.127 -> -9.127  (+0.000)
+  unk_q05    near_miss  3.563 -> 3.563  (+0.000)
+  unk_q06    near_miss  -3.220 -> -3.220  (+0.000)
+  unk_q07    near_miss  -0.429 -> -0.429  (+0.000)
+  unk_q12    off_topic  -11.153 -> -11.153  (+0.000)
+  unk_q11    off_topic  -10.960 -> -10.989  (-0.028)
+  unk_q10    off_topic  -10.657 -> -10.795  (-0.138)
+  unk_q08    near_miss  -5.010 -> -5.154  (-0.144)
+  oli_q10    near_miss  -0.095 -> -0.307  (-0.212)
