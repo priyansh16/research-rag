@@ -256,7 +256,7 @@ PDF → semantic document elements → intelligent chunking
 - No CI workflow yet runs the `e2e` split automatically
 
 ### Planned Improvements
-- CI workflow: `pytest -m "not e2e"` per commit, `pytest -m e2e` daily
+- CI workflow: `pytest -m "not e2e and not eval"` per commit, `pytest -m eval` when `evaluation/` changes, `pytest -m e2e` daily
 - Parallelize health checks
 - Alembic migrations, evaluation layer (RAGAS)
 
@@ -315,3 +315,20 @@ Each experiment's hypothesis, setup, results and decision is recorded in
 - Still no score threshold for near-miss unanswerable questions, on cosine or reranker scores → refusal belongs in generation.
 - Learning: when two experiments touch the same function, merge the winner into `feat/evaluation` first, then merge
   `feat/evaluation` into the other branch, resolve once, and compare against the new reference (not the old baseline).
+
+### E4 chunking + tables, E2 switched on (2026-11-05)
+- E4a (overlap 2 → 1 element capped at 300 chars, split long elements): hit@3 62 → 56, 8 regressions. Chunks got cleaner
+  (max 3,447 → 1,279 chars), but answer copies per question fell 2.65 → 1.29. Overlap wasn't just noise: every copy is
+  another chance to reach the reranker's pool and the top 3.
+- E4b (tables rebuilt from the PDF text layer): ±0; broke the 3 LINHAC_2025 table questions. The longer table text pushed
+  the caption — the part that matches the question — into another chunk; bbox picked up figure junk; columns merged.
+  The OCR damage that motivated it was limited to one paper (Erik); unstructured had read the other tables fine.
+- Neither adopted; main collection not re-ingested. Kept two chunker bug fixes (empty first chunk, `OVERLAP_ELEMENTS=0`).
+- E2 dedup w1 switched on by default: it was held only in case E4 removed overlap. With overlap staying it gives +2.
+  Final retrieval setup: vector top 15 → MiniLM rerank → drop ±1 neighbours → top 3. hit@3 52 → 64 of 79.
+- Learnings:
+  - Measure *why* before rejecting: reachability ruled out broken labels; counting answer-bearing chunks found the mechanism.
+  - A predicted latency win (shorter chunks → cheaper reranking) didn't happen: the cross-encoder truncates at 512 tokens anyway.
+  - hit@k rewards redundant copies and doesn't see wasted context; generation eval should check whether the
+    duplicated chunks hurt answers.
+  - Check what a table actually looks like in each paper before "fixing" tables globally; the problem was paper-specific.

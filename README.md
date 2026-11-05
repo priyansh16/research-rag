@@ -143,10 +143,11 @@ Grounded Response
   lifecycle (one shared instance per service, built once at startup)
 - Retrieval evaluation harness: hit@k, MRR and answer reachability on a
   96-question golden set, with run-to-run comparison per question
-- 129 automated tests covering ingestion, retrieval, prompt building,
-  guardrails, generation, evaluation metrics, and real API/DI wiring
-  end-to-end, split into a fast per-commit suite (127) and a scheduled
-  Ollama-dependent `e2e` suite (2)
+- 105 automated tests covering ingestion, retrieval, reranking, prompt building,
+  guardrails, generation, evaluation tooling, and real API/DI wiring
+  end-to-end, split into a fast per-commit app suite (45), evaluation
+  tooling tests (58, `eval` marker) and a scheduled Ollama-dependent
+  `e2e` suite (2)
 
 ### In Progress
 - Retrieval experiments (chunk dedup, chunking, reranking); see [Retrieval Evaluation](#retrieval-evaluation)
@@ -174,11 +175,12 @@ run directly against `RetrievalService` with no HTTP and no LLM.
 | E0 | Answer reachability | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
 | E1 | BGE query prefix | | | | | | | Not adopted, no effect (v1 set only) |
 | E3 | **Reranker: MiniLM-L-6, 15 candidates** | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted** (bge-reranker-base: 6 regressions, 3× slower) |
-| E2 | Reranker + neighbour dedup (window 1) | 55 | **64** | 67 | 69 | 0.760 | 228 | +2, 0 regressions; merged off, decide after E4 |
-| E4 | Chunking overlap fix | | | | | | | Planned |
+| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current setup** |
+| E4 | Chunking: less overlap, split long elements (+ text-layer tables) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6; overlap was adding recall |
 
 Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
-The cross-encoder reranker lifted hit@3 from 52 to 62 and hit@1 from 37 to 55, at ~210 ms extra per query on CPU.
+Vector search alone found the answer in the top 3 for 52/79 questions; with the cross-encoder reranker and
+neighbour dedup it's 64/79 (hit@1 37 → 55), at ~210 ms extra per query on CPU.
 Results on the earlier 61-question set are kept in EXPERIMENTS.md.
 Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
 
@@ -368,8 +370,11 @@ uv run uvicorn src.main:app --reload
 # Run all tests (including e2e tests that require a local Ollama server)
 uv run pytest
 
-# Run the fast suite only (per-commit, skips e2e)
-uv run pytest -m "not e2e"
+# Run the fast app suite (per-commit, skips e2e and evaluation tooling)
+uv run pytest -m "not e2e and not eval"
+
+# Run the evaluation tooling tests (when evaluation/ code changes)
+uv run pytest -m eval
 
 # Run only the e2e suite (needs `ollama serve` running locally)
 uv run pytest -m "e2e"

@@ -192,6 +192,20 @@ def build_services():
     return chroma_service, retrieval_service
 
 
+def chunk_char_stats(indexed_chunks: Dict[str, List[Tuple[int, str]]]) -> Dict:
+    """Chunk length stats over every stored chunk, and how many exceed MAX_CHUNK_SIZE."""
+    lengths = [len(text) for chunks in indexed_chunks.values() for _, text in chunks]
+    if not lengths:
+        return {}
+    return {
+        "mean": round(sum(lengths) / len(lengths)),
+        "p95": percentile(lengths, 95),
+        "max": max(lengths),
+        "limit": settings.MAX_CHUNK_SIZE,
+        "over_limit": sum(n > settings.MAX_CHUNK_SIZE for n in lengths),
+    }
+
+
 def load_indexed_chunks(chroma_service) -> Dict[str, List[Tuple[int, str]]]:
     """Every stored chunk as {document_name: [(chunk_index, text), ...]}."""
     stored = chroma_service.collection.get(include=["documents", "metadatas"])
@@ -348,6 +362,10 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
         print(f"  rerank:     {meta['rerank']} (top {meta['rerank_candidates']} candidates; "
               f"scores below are reranker scores, not cosine)")
     print(f"  collection: {meta['collection']} | metric={meta['distance_metric']} | chunks={meta['indexed_chunks']}")
+    sizes = meta.get("chunk_chars")
+    if sizes:
+        print(f"  chunk chars: mean={sizes['mean']} p95={sizes['p95']} max={sizes['max']} "
+              f"| over {sizes['limit']}: {sizes['over_limit']}")
     print(f"  questions:  {meta['questions']} ({len(answerable)} answerable, "
           f"{meta['questions'] - len(answerable)} unanswerable) | app top_k={doc_k}\n")
 
@@ -437,6 +455,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "distance_metric": collection_metadata.get("hnsw:space", "l2 (default)"),
         "indexed_chunks": sum(chunk_counts.values()),
         "chunks_per_doc": chunk_counts,
+        # Measured from the stored chunks, so it shows which chunking the
+        # collection was built with, whatever the current env settings are.
+        "chunk_chars": chunk_char_stats(indexed_chunks),
         "questions": len(questions),
         "questions_file": str(args.questions),
         "ks": ks,

@@ -11,9 +11,11 @@
 | E3 | [Reranker](#e3-cross-encoder-reranker) bge-reranker-base, 20 cand. | 50 | **60** | 65 | 68 | 0.715 | 941 | Not adopted: 6 regressions, 3× slower |
 | E3 | Reranker MiniLM-L-6, 20 cand. | 55 | **61** | 65 | 71 | 0.755 | 301 | +9 at k=3, 0 regressions |
 | E3 | Reranker MiniLM-L-6, 30 cand. | 56 | **62** | 65 | 71 | 0.763 | 434 | Same quality, too slow |
-| E3 | **Reranker MiniLM-L-6, 15 cand.** (`rerank_minilm_c15`) | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted, default.** Current reference |
-| E2+E3 | Reranker c15 + neighbour dedup w1 | 55 | **64** | 67 | 69 | 0.760 | 228 | +2 vs c15, 0 regressions. Merged **off**; decide in E4 |
-| E4 | [Chunking overlap fix](#e4-chunking-overlap-fix) | | | | | | | Planned |
+| E3 | **Reranker MiniLM-L-6, 15 cand.** (`rerank_minilm_c15`) | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted, default** |
+| E2+E3 | **Reranker c15 + neighbour dedup w1** (`rerank_c15_neighbor_w1`) | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted, default. Final reference** |
+| E4a | [Chunking: overlap cap + split long elements](#e4-chunking-overlap-fix) (`e4_rerank`) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6 vs c15 (2 up, 8 down) |
+| E4b | E4a + text-layer tables (`e4t_rerank`) | 50 | **56** | 59 | 65 | 0.686 | 254 | Not adopted: ±0 vs E4a (3 up, 3 down) |
+| E4b+E2 | E4b + dedup w1 (`e4t_rerank_w1`) | 50 | **56** | 58 | 59 | 0.674 | — | No effect at k=3 without overlap |
 
 Counts are out of 79 answerable questions; 1 question = 1.3 points, so ±1 question is within noise.
 Latency is p50 of `search()` on a laptop CPU after warm-up (embedding + Chroma + reranking).
@@ -81,9 +83,11 @@ v1 and v2 numbers are not comparable with each other. E1 was not re-run on v2 (o
 - **Failure mode:** bic_q05's answer is in chunks 44–45, next to a higher-ranked chunk 43 without it, so the answer
   chunks were dropped as "duplicates". Query-time dropping can't tell overlapping text from new text; a wider window drops more.
   Still present with the reranker: bic_q14 (rank 5 → out).
-- **Decision:** w2 not adopted. w1 cleared the bar (+2, 0 regressions, three consistent runs) and is **merged into
-  `feat/evaluation` but off by default** (`RETRIEVAL_NEIGHBOR_WINDOW = 0`): it works around chunk overlap, which E4
-  removes at ingest, so the gain may disappear. E4 is measured with w0 and w1; switch it on only if it still helps.
+- **Result (E4 chunks, no overlap):** no change at k=3; hit@10 −6 because neighbours are no longer duplicates, so
+  dropping them only loses unique text (and the 15-candidate pool runs short).
+- **Decision:** w2 not adopted. w1 cleared the bar (+2, 0 regressions, three consistent runs). It was first merged
+  off, pending E4, which would remove overlap at ingest. E4 lost and the overlapping chunks stay, so **w1 is on by
+  default** (`RETRIEVAL_NEIGHBOR_WINDOW = 1`). Revisit if chunking ever drops overlap.
 - **Evidence:** `comparisons/2026-11-03_rerank_c15_vs_rerank_c15_neighbor_w1.txt`,
   `comparisons/2026-11-03_baseline_v2_vs_neighbor_w1_v2.txt`, `..._vs_neighbor_w2_v2.txt`
   (v1: `comparisons/2026-11-02_baseline_reach_vs_neighbor_w1.txt`, `..._vs_neighbor_w2.txt`)
@@ -116,6 +120,31 @@ v1 and v2 numbers are not comparable with each other. E1 was not re-run on v2 (o
 
 ## E4: Chunking overlap fix
 
-- **Hypothesis:** chunks that don't repeat each other's text stop crowding the top 3, without dropping unique content as E2 did.
-- **Change:** smaller overlap, split oversized elements, cap chunk size. Needs a re-ingest into a new collection.
-  Measured with the reranker on (the default), with neighbour dedup w0 and w1, against `rerank_minilm_c15`.
+- **Hypothesis:** chunks that don't repeat each other's text stop crowding the top 3, without dropping unique content
+  as E2 did; text-layer tables fix OCR-garbled table text.
+- **Change (branch `exp/eval_chunking`, re-ingested into new collections; the main collection is untouched):**
+  - E4a `research_documents_e4`: `OVERLAP_ELEMENTS=1`, `CHUNK_OVERLAP_MAX_CHARS=300` (carry only short trailing
+    elements, never past the size limit), `CHUNK_SPLIT_LONG_ELEMENTS=true` (split elements over 1,200 chars at
+    sentence ends). 313 → 202 chunks; max chunk 3,447 → 1,279 chars.
+  - E4b `research_documents_e4t`: E4a + `TABLE_TEXT_SOURCE=text_layer` (rebuild unstructured Table elements from the
+    PDF text layer, one row per line, ` | ` at column gaps, instead of OCR'd flattened cells).
+- **Result E4a:** hit@3 62 → 56 (2 improved, 8 regressed, most from rank 1–2), hit@1 55 → 51. Reachability unchanged
+  (78/79), so these are ranking losses, not broken labels.
+- **Why:** overlap gave each answer several copies. Chunks containing the answer per question: **2.65 → 1.29** on
+  average; questions with the answer in a single chunk: 17 → 68. Each copy is another chance to enter the reranker's
+  15 candidates and the top 3; removing overlap removed those chances. Overlap crowds the top 3 with duplicates (E2
+  handles that at query time), but it also adds recall, and with a reranker the recall matters more.
+  Latency did not drop (p95 340 → 355 ms): the reranker truncates at 512 tokens, so long chunks never cost extra.
+- **Result E4b (tables):** ±0 at k=3 (3 up, 3 down). The 3 regressions are the LINHAC_2025 table questions
+  (gmm_q06/12/17), from rank 1–2 to outside the top 10. In Table 5: the longer table text pushed its caption
+  ("Defenders closest to the centroids…", nearly the question's wording) into another chunk; a junk first row
+  (`gg g | / | / | /`) came from figure fragments in the bbox; narrow gaps merged cells. unstructured had already read
+  this paper's tables correctly, and the OCR damage was specific to LINHAC_2022_Erik.
+- **Caveat on the metric:** hit@k counts a question solved if *any* copy is in the top k and doesn't penalise near-
+  duplicates filling the LLM context; that cost would show in generation eval, not here.
+- **Decision:** not adopted, neither E4a nor E4b. Old chunking stays (no re-ingest of the main collection). Two
+  always-on chunker bug fixes were ported to `feat/evaluation` (no empty chunk for an oversized first element;
+  `OVERLAP_ELEMENTS=0` means no overlap), plus the `chunk chars` line in run reports. Untested: split-only (keep the
+  2-element overlap, split only oversized elements so their tails get embedded).
+- **Evidence:** `comparisons/2026-11-05_rerank_c15_vs_e4_rerank.txt`, `..._e4_rerank_vs_e4t_rerank.txt`,
+  `..._e4t_rerank_vs_e4t_rerank_w1.txt`

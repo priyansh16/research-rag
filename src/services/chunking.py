@@ -59,13 +59,18 @@ def build_semantic_chunks(elements: List[str]) -> List[str]:
         
         element_length = len(element)
         
-        # create chunk 
-        if current_length + element_length > settings.MAX_CHUNK_SIZE:
-            
+        # create chunk. Never close an empty one: an oversized first
+        # element used to produce an empty chunk here.
+        if current_chunk and current_length + element_length > settings.MAX_CHUNK_SIZE:
+
             chunks.append("\n\n".join(current_chunk))
-            
-            # semantic overlap
-            overlap = current_chunk[-settings.OVERLAP_ELEMENTS:]
+
+            # semantic overlap ([-0:] would be the whole list, so guard 0)
+            overlap = (
+                current_chunk[-settings.OVERLAP_ELEMENTS:]
+                if settings.OVERLAP_ELEMENTS > 0
+                else []
+            )
             
             current_chunk = overlap.copy()
             current_length = sum(len(x) for x in current_chunk)

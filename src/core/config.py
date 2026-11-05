@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     TOP_K_RESULTS:int =  3
     # Drop chunks within ±N positions of a higher-ranked chunk from the same
     # document (overlapping chunks are near-duplicates). 0 = off.
-    RETRIEVAL_NEIGHBOR_WINDOW: int = 0
+    # On (1) since E4: chunks keep their 2-element overlap (removing it lost
+    # 6 questions), and on top of the reranker w1 gave +2 hit@3, 0 regressions.
+    RETRIEVAL_NEIGHBOR_WINDOW: int = 1
     # Cross-encoder that re-orders the vector-search candidates.
     # Adopted in E3: MiniLM beat bge-reranker-base (+9 hit@3, 0 regressions, 3x faster).
     # Empty = reranking off.

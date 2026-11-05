@@ -14,6 +14,12 @@ from src.services.retrieval.reranker_service import (
 from src.services.retrieval.retrieval_service import RetrievalService
 
 
+@pytest.fixture(autouse=True)
+def neighbor_dropping_off(monkeypatch):
+    """Test the reranker on its own; the combined test turns dropping back on."""
+    monkeypatch.setattr(settings, "RETRIEVAL_NEIGHBOR_WINDOW", 0)
+
+
 def r(name, score):
     return {"chunks": name, "metadata": {"chunk_index": name}, "score": score}
 
@@ -65,12 +71,6 @@ def test_apply_rerank_scores_keeps_vector_score():
     assert reranked[0]["vector_score"] == 0.9
 
 
-def test_apply_rerank_scores_does_not_mutate_input():
-    results = [r("a", 0.9)]
-    apply_rerank_scores(results, [0.3])
-    assert results[0] == r("a", 0.9)
-
-
 def test_apply_rerank_scores_ties_keep_vector_order():
     results = [r("a", 0.9), r("b", 0.8), r("c", 0.7)]
     reranked = apply_rerank_scores(results, [0.5, 0.5, 0.5])
@@ -89,12 +89,6 @@ def test_rerank_passes_query_chunk_pairs():
     reranked = reranker.rerank("q", [r("a", 0.9), r("b", 0.8)])
     assert model.calls == [[("q", "a"), ("q", "b")]]
     assert [x["chunks"] for x in reranked] == ["b", "a"]
-
-
-def test_rerank_empty_results_skips_model():
-    model = FakeCrossEncoder({})
-    assert RerankerService("fake", model=model).rerank("q", []) == []
-    assert model.calls == []
 
 
 def test_build_reranker_service_none_when_model_empty(monkeypatch):

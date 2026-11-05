@@ -21,17 +21,23 @@ https://keepachangelog.com/en/1.1.0/
 - `compare_runs.py`: question-by-question diff between two runs (improved, regressed, rank changes,
   config differences, unanswerable score shifts).
 - `summarize_results.py`: regenerates `results.md` tables from every run in `results/`.
-- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted; E2 neighbour dedup, merged off; E3 reranker, adopted).
+- `EXPERIMENTS.md`: experiment summary table and decisions (E0 answer reachability; E1 BGE query prefix, not adopted; E2 neighbour dedup, adopted; E3 reranker, adopted;
+  E4 chunking overlap fix and text-layer tables, not adopted).
+- Evaluation run reports show chunk size stats measured from the stored chunks (mean, p95, max, over the limit).
 - Cross-encoder reranking in `RetrievalService.search()` (`RerankerService`, `src/services/retrieval/reranker_service.py`):
   re-scores the top `RETRIEVAL_RERANK_CANDIDATES` (default 15) vector-search chunks with `RETRIEVAL_RERANKER_MODEL`
   (default `cross-encoder/ms-marco-MiniLM-L-6-v2`; empty = off). Results carry the reranker `score` and the original
   `vector_score`. Eval: hit@3 52 → 62 of 79, hit@1 37 → 55; p50 retrieval latency 21 → 231 ms on CPU.
-- Optional neighbour-chunk dropping (`RETRIEVAL_NEIGHBOR_WINDOW`, default 0 = off): skips chunks within ±N positions of a
-  higher-ranked chunk from the same document, applied after reranking.
+- Neighbour-chunk dropping (`RETRIEVAL_NEIGHBOR_WINDOW`, default 1; 0 = off): skips chunks within ±N positions of a
+  higher-ranked chunk from the same document (overlapping chunks are near-duplicates), applied after reranking.
+  Eval: +2 hit@3 on top of the reranker (62 → 64 of 79), 0 regressions, no latency cost.
 - Evaluation run metadata records `rerank`, `rerank_candidates` and `neighbor_window`.
 - `RetrievalService.search()` accepts an optional `top_k` (defaults to `settings.TOP_K_RESULTS`, rejects values < 1), so callers like the evaluation harness can request k per call without mutating global settings.
 - Ingest log now reports `submitted` vs actually `stored` chunk counts and warns on partial indexing.
-- Test suite grew from 28 to 129 tests (127 fast, 2 `e2e`).
+- Test suite grew from 28 to 105 tests: 45 app, 58 evaluation tooling (`eval` marker, run separately), 2 `e2e`.
+  Redundant tests were pruned (e.g. `summarize_results` tests, duplicate compare_runs/metrics edge cases) and
+  one-service-one-file applied (neighbour-dropping tests live in `test_retrieval.py`).
+  Per-commit app run: `pytest -m "not e2e and not eval"`.
 
 
 ### Changed
@@ -44,6 +50,9 @@ https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Chunker emitted an empty chunk when a document's first element was longer than `MAX_CHUNK_SIZE`, and
+  `OVERLAP_ELEMENTS=0` carried the whole previous chunk (`[-0:]` slices everything) instead of none. Neither case
+  occurs in the current collection, so stored chunks are unaffected.
 - `ChromaService.add_document` generated chunk IDs as `chunk_{i}` per document, so every document after the first collided on existing IDs and Chroma silently skipped them — only 97 of 313 chunks were indexed. IDs are now scoped as `{document_id}_chunk_{chunk_index}`.
 - Rebuilt existing vector stores (delete `chroma_db/` and `rag.db`, re-upload documents) to recover the missing chunks.
 - `pyproject.toml` version was stale at `0.1.0`; set to the current release, `0.3.0`.
