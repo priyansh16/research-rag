@@ -1,19 +1,6 @@
 import numpy as np
 
 
-def test_embedding_generation(
-    embedding_service
-):
-
-    embedding = embedding_service.embed_text(
-        "Machine Learning"
-    )
-
-    assert isinstance(embedding, list)
-
-    assert len(embedding) > 0
-
-
 def test_embedding_dimensions_consistent(
     embedding_service
 ):
@@ -25,6 +12,8 @@ def test_embedding_dimensions_consistent(
     emb2 = embedding_service.embed_text(
         "Ice Hockey"
     )
+
+    assert isinstance(emb1, list) and len(emb1) > 0
 
     assert len(emb1) == len(emb2)
 

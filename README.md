@@ -142,11 +142,12 @@ Grounded Response
 - FastAPI dependency injection with application-scoped service
   lifecycle (one shared instance per service, built once at startup)
 - Retrieval evaluation harness: hit@k, MRR and answer reachability on a
-  61-question golden set, with run-to-run comparison per question
-- 129 automated tests covering ingestion, retrieval, prompt building,
-  guardrails, generation, evaluation metrics, and real API/DI wiring
-  end-to-end, split into a fast per-commit suite (127) and a scheduled
-  Ollama-dependent `e2e` suite (2)
+  96-question golden set, with run-to-run comparison per question
+- 105 automated tests covering ingestion, retrieval, reranking, prompt building,
+  guardrails, generation, evaluation tooling, and real API/DI wiring
+  end-to-end, split into a fast per-commit app suite (45), evaluation
+  tooling tests (58, `eval` marker) and a scheduled Ollama-dependent
+  `e2e` suite (2)
 
 ### In Progress
 - Retrieval experiments (chunk dedup, chunking, reranking); see [Retrieval Evaluation](#retrieval-evaluation)
@@ -165,17 +166,22 @@ Grounded Response
 
 ## Retrieval Evaluation
 
-A hand-labelled set of 61 questions over the 5 indexed papers (44 answerable, 17 unanswerable),
+A hand-labelled set of 96 questions over the 5 indexed papers (79 answerable, 17 unanswerable),
 run directly against `RetrievalService` with no HTTP and no LLM.
 
-| # | Experiment | hit@1 | hit@3 | hit@5 | MRR@10 | Verdict |
-|---|---|---|---|---|---|---|
-| — | Baseline | 19 | **30** | 35 | 0.576 | Reference |
-| E0 | Answer reachability | — | — | — | — | Diagnostic: 43/44 answers reachable |
-| E1 | BGE query prefix | 18 | **31** | 33 | 0.561 | Not adopted, no effect |
-| E2 | Neighbour dedup | | | | | Planned |
+| # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | p50 ms | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| — | Baseline v2 (vector search only) | 37 | **52** | 59 | 66 | 0.583 | 21 | Reference for E2, E3 |
+| E0 | Answer reachability | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
+| E1 | BGE query prefix | | | | | | | Not adopted, no effect (v1 set only) |
+| E3 | **Reranker: MiniLM-L-6, 15 candidates** | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted** (bge-reranker-base: 6 regressions, 3× slower) |
+| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current setup** |
+| E4 | Chunking: less overlap, split long elements (+ text-layer tables) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6; overlap was adding recall |
 
-Counts are out of 44 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
+Vector search alone found the answer in the top 3 for 52/79 questions; with the cross-encoder reranker and
+neighbour dedup it's 64/79 (hit@1 37 → 55), at ~210 ms extra per query on CPU.
+Results on the earlier 61-question set are kept in EXPERIMENTS.md.
 Hypotheses, changes and decisions for each experiment: [EXPERIMENTS.md](evaluation/retrieval/EXPERIMENTS.md).
 
 ```bash
@@ -364,8 +370,11 @@ uv run uvicorn src.main:app --reload
 # Run all tests (including e2e tests that require a local Ollama server)
 uv run pytest
 
-# Run the fast suite only (per-commit, skips e2e)
-uv run pytest -m "not e2e"
+# Run the fast app suite (per-commit, skips e2e and evaluation tooling)
+uv run pytest -m "not e2e and not eval"
+
+# Run the evaluation tooling tests (when evaluation/ code changes)
+uv run pytest -m eval
 
 # Run only the e2e suite (needs `ollama serve` running locally)
 uv run pytest -m "e2e"

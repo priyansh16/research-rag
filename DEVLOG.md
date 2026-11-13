@@ -256,7 +256,7 @@ PDF → semantic document elements → intelligent chunking
 - No CI workflow yet runs the `e2e` split automatically
 
 ### Planned Improvements
-- CI workflow: `pytest -m "not e2e"` per commit, `pytest -m e2e` daily
+- CI workflow: `pytest -m "not e2e and not eval"` per commit, `pytest -m eval` when `evaluation/` changes, `pytest -m e2e` daily
 - Parallelize health checks
 - Alembic migrations, evaluation layer (RAGAS)
 
@@ -292,4 +292,43 @@ Each experiment's hypothesis, setup, results and decision is recorded in
 
 - E0, answer reachability: 43/44 answers exist in an indexed chunk → ranking, not ingestion, is the bottleneck.
 - E1, BGE query prefix: not adopted, no effect (hit@3 30 → 31/44, one question).
+- E2, neighbour dedup (v1 set): tie at k=3; answers moved up consistently (hit@5 35 → 37), but dropping "duplicates" at query time also drops unique text (bic_q05). See the v2 and E3 entries below for the later results.
 - Learning: with 44 answerable questions, 1 question = 2.3 points, so ±1–2 questions is noise. Judge by the Improved/Regressed lists, not aggregate deltas.
+
+### Question set v2 (2026-11-03)
+- Grew the set to 96 questions (79 answerable), written from the PDFs; more paraphrased and table questions.
+- baseline_v2: hit@3 52/79 (0.66), hit@10 66/79; 14 of 27 misses rank 4–10. Weakest: tables 0.46, paraphrased 0.56, LINHAC_2025 0.39.
+- Found while labelling: tables are stored as OCR text that drops diacritics ("Växjö" → "Vaxjo") and garbles some words
+  ("Frölunda" → "Frélunda", "1st" → "Ist"). `normalize_for_match` now folds accents; garbled OCR can't be matched.
+- E2 re-run: w1 hit@3 +2 (3 improved, 1 regressed), hit@5 +3; w2 +1 with 3 regressions. w1 held for a combined run with the reranker (E3).
+- Learning: experiment branches must merge `feat/evaluation` before re-running, not just copy `questions.jsonl`; otherwise tooling fixes (like accent folding) are missing and show up as false regressions, and copied files make the run `-dirty`.
+
+### E3 reranker, E2 combined (2026-11-03)
+- E3 adopted: cross-encoder `ms-marco-MiniLM-L-6-v2` re-scores 15 vector candidates. hit@3 52 → 62, hit@1 37 → 55, 0 regressions; p50 21 → 231 ms.
+- bge-reranker-base lost despite being 12× bigger: 6 regressions (direct facts pushed from rank 1 to 4) and near-1.0 scores for off-topic
+  questions against noisy number tables. Bigger reranker ≠ better on OCR-heavy academic text.
+- Biggest gains on tables: the cross-encoder reads query + OCR'd table together; separate embeddings of a number grid match poorly.
+- Pool size 15/20/30 gave hit@3 62/61/62 — flat; 15 chosen on a tie for latency. Answers can already sit at vector rank 21–30,
+  so revisit pool size when the corpus grows.
+- E2 dedup w1 on top of the reranker: +2 hit@3, 0 regressions, free. The reranker gives overlapping near-duplicates near-identical
+  scores, so it can't dedupe itself. Merged off by default: E4 removes overlap at ingest and may make it redundant.
+- Still no score threshold for near-miss unanswerable questions, on cosine or reranker scores → refusal belongs in generation.
+- Learning: when two experiments touch the same function, merge the winner into `feat/evaluation` first, then merge
+  `feat/evaluation` into the other branch, resolve once, and compare against the new reference (not the old baseline).
+
+### E4 chunking + tables, E2 switched on (2026-11-05)
+- E4a (overlap 2 → 1 element capped at 300 chars, split long elements): hit@3 62 → 56, 8 regressions. Chunks got cleaner
+  (max 3,447 → 1,279 chars), but answer copies per question fell 2.65 → 1.29. Overlap wasn't just noise: every copy is
+  another chance to reach the reranker's pool and the top 3.
+- E4b (tables rebuilt from the PDF text layer): ±0; broke the 3 LINHAC_2025 table questions. The longer table text pushed
+  the caption — the part that matches the question — into another chunk; bbox picked up figure junk; columns merged.
+  The OCR damage that motivated it was limited to one paper (Erik); unstructured had read the other tables fine.
+- Neither adopted; main collection not re-ingested. Kept two chunker bug fixes (empty first chunk, `OVERLAP_ELEMENTS=0`).
+- E2 dedup w1 switched on by default: it was held only in case E4 removed overlap. With overlap staying it gives +2.
+  Final retrieval setup: vector top 15 → MiniLM rerank → drop ±1 neighbours → top 3. hit@3 52 → 64 of 79.
+- Learnings:
+  - Measure *why* before rejecting: reachability ruled out broken labels; counting answer-bearing chunks found the mechanism.
+  - A predicted latency win (shorter chunks → cheaper reranking) didn't happen: the cross-encoder truncates at 512 tokens anyway.
+  - hit@k rewards redundant copies and doesn't see wasted context; generation eval should check whether the
+    duplicated chunks hurt answers.
+  - Check what a table actually looks like in each paper before "fixing" tables globally; the problem was paper-specific.

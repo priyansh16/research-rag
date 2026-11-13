@@ -1,0 +1,78 @@
+Comparing  A: baseline_v2 (2026-11-03, git 91f8517)
+       ->  B: rerank_bge_base (2026-11-03, git fd94097)
+
+Config differences
+  git: 91f8517 -> fd94097
+  rerank: (missing) -> BAAI/bge-reranker-base
+  rerank_candidates: (missing) -> 20
+
+Overall (answerable)
+  metric             A       B    delta
+  hit@1          0.468   0.633   +0.165
+  hit@3          0.658   0.759   +0.101
+  hit@5          0.747   0.823   +0.076
+  hit@10         0.835   0.861   +0.025
+  mrr@10         0.583   0.715   +0.133
+  doc_hit@3      0.911   0.899   -0.013
+
+Outcomes at k=3: 14 improved, 6 regressed, 15 rank changed, 44 unchanged
+
+Improved (miss -> hit at k=3) (14)
+  gmm_q03    direct/body        LINHAC_2025.pdf          rank  - -> 2
+  gmm_q06    direct/table       LINHAC_2025.pdf          rank  - -> 2
+  gmm_q17    direct/table       LINHAC_2025.pdf          rank  - -> 2
+  ras_q14    paraphrased/body   MLSA23-RASMAS.pdf        rank  - -> 3
+  oli_q04    direct/body        LINHAC_2024_Oliver.pdf   rank  9 -> 1
+  gmm_q16    direct/table       LINHAC_2025.pdf          rank  8 -> 1
+  eri_q11    paraphrased/body   LINHAC_2022_Erik.pdf     rank  7 -> 1
+  bic_q01    direct/body        GMM_BIC.pdf              rank  6 -> 1
+  gmm_q08    paraphrased/body   LINHAC_2025.pdf          rank  6 -> 1
+  gmm_q12    direct/table       LINHAC_2025.pdf          rank  5 -> 1
+  eri_q08    paraphrased/body   LINHAC_2022_Erik.pdf     rank  5 -> 2
+  gmm_q01    direct/body        LINHAC_2025.pdf          rank  5 -> 2
+  gmm_q05    direct/table       LINHAC_2025.pdf          rank  4 -> 1
+  ras_q06    paraphrased/body   MLSA23-RASMAS.pdf        rank  4 -> 1
+
+Regressed (hit -> miss at k=3) (6)
+  oli_q13    paraphrased/body   LINHAC_2024_Oliver.pdf   rank  2 -> -
+  eri_q09    paraphrased/body   LINHAC_2022_Erik.pdf     rank  1 -> 4
+  ras_q03    direct/body        MLSA23-RASMAS.pdf        rank  1 -> 4
+  ras_q09    direct/body        MLSA23-RASMAS.pdf        rank  1 -> 4
+  eri_q15    paraphrased/body   LINHAC_2022_Erik.pdf     rank  3 -> 4
+  gmm_q10    paraphrased/body   LINHAC_2025.pdf          rank  3 -> 4
+
+Rank changed, same outcome at k=3 (15)
+  bic_q14    paraphrased/body   GMM_BIC.pdf              rank  - -> 6
+  oli_q08    paraphrased/body   LINHAC_2024_Oliver.pdf   rank  5 -> -
+  oli_q14    paraphrased/body   LINHAC_2024_Oliver.pdf   rank  4 -> -
+  bic_q03    direct/body        GMM_BIC.pdf              rank  3 -> 1
+  gmm_q02    direct/body        LINHAC_2025.pdf          rank  3 -> 1
+  gmm_q04    direct/body        LINHAC_2025.pdf          rank  3 -> 1
+  gmm_q09    paraphrased/body   LINHAC_2025.pdf          rank  3 -> 1
+  bic_q11    direct/body        GMM_BIC.pdf              rank  2 -> 1
+  eri_q10    direct/body        LINHAC_2022_Erik.pdf     rank  1 -> 2
+  oli_q03    direct/body        LINHAC_2024_Oliver.pdf   rank  2 -> 1
+  oli_q12    direct/table       LINHAC_2024_Oliver.pdf   rank  2 -> 1
+  ras_q02    direct/body        MLSA23-RASMAS.pdf        rank  2 -> 1
+  ras_q04    direct/body        MLSA23-RASMAS.pdf        rank  2 -> 1
+  ras_q08    paraphrased/body   MLSA23-RASMAS.pdf        rank  2 -> 1
+  ras_q11    direct/body        MLSA23-RASMAS.pdf        rank  1 -> 2
+
+Unanswerable top-1 score, lower is better (17)
+  unk_q10    off_topic  0.557 -> 0.995  (+0.437)
+  gen_q02    near_miss  0.626 -> 1.000  (+0.374)
+  gen_q01    near_miss  0.692 -> 0.976  (+0.284)
+  unk_q09    off_topic  0.500 -> 0.766  (+0.266)
+  gmm_q11    near_miss  0.772 -> 0.988  (+0.216)
+  unk_q02    near_miss  0.733 -> 0.930  (+0.198)
+  unk_q03    near_miss  0.791 -> 0.970  (+0.179)
+  unk_q05    near_miss  0.832 -> 0.979  (+0.146)
+  unk_q08    near_miss  0.679 -> 0.233  (-0.446)
+  unk_q06    near_miss  0.678 -> 0.216  (-0.462)
+  unk_q11    off_topic  0.486 -> 0.000  (-0.486)
+  oli_q10    near_miss  0.736 -> 0.214  (-0.522)
+  unk_q07    near_miss  0.786 -> 0.239  (-0.546)
+  unk_q12    off_topic  0.595 -> 0.001  (-0.594)
+  unk_q04    near_miss  0.656 -> 0.016  (-0.640)
+  unk_q01    near_miss  0.688 -> 0.026  (-0.663)
+  gen_q03    near_miss  0.665 -> 0.000  (-0.665)

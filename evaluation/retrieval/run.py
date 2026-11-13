@@ -180,14 +180,30 @@ def build_services():
     from src.services.embeddings.embedding_service import EmbeddingService
     from src.services.vectorstore.chroma_service import ChromaService
     from src.services.retrieval.retrieval_service import RetrievalService
+    from src.services.retrieval.reranker_service import build_reranker_service
 
     embedding_service = EmbeddingService()
     chroma_service = ChromaService()
     retrieval_service = RetrievalService(
         embedding_service=embedding_service,
         chroma_service=chroma_service,
+        reranker_service=build_reranker_service(),
     )
     return chroma_service, retrieval_service
+
+
+def chunk_char_stats(indexed_chunks: Dict[str, List[Tuple[int, str]]]) -> Dict:
+    """Chunk length stats over every stored chunk, and how many exceed MAX_CHUNK_SIZE."""
+    lengths = [len(text) for chunks in indexed_chunks.values() for _, text in chunks]
+    if not lengths:
+        return {}
+    return {
+        "mean": round(sum(lengths) / len(lengths)),
+        "p95": percentile(lengths, 95),
+        "max": max(lengths),
+        "limit": settings.MAX_CHUNK_SIZE,
+        "over_limit": sum(n > settings.MAX_CHUNK_SIZE for n in lengths),
+    }
 
 
 def load_indexed_chunks(chroma_service) -> Dict[str, List[Tuple[int, str]]]:
@@ -341,8 +357,15 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
     answerable = [r for r in results if r.answerable]
 
     print(f"\nRetrieval evaluation: {meta['label']}  ({meta['timestamp']}, git {meta['git']})")
-    print(f"  model:      {meta['embedding_model']}")
+    print(f"  model:      {meta['embedding_model']} | neighbor_window={meta['neighbor_window']}")
+    if meta.get("rerank"):
+        print(f"  rerank:     {meta['rerank']} (top {meta['rerank_candidates']} candidates; "
+              f"scores below are reranker scores, not cosine)")
     print(f"  collection: {meta['collection']} | metric={meta['distance_metric']} | chunks={meta['indexed_chunks']}")
+    sizes = meta.get("chunk_chars")
+    if sizes:
+        print(f"  chunk chars: mean={sizes['mean']} p95={sizes['p95']} max={sizes['max']} "
+              f"| over {sizes['limit']}: {sizes['over_limit']}")
     print(f"  questions:  {meta['questions']} ({len(answerable)} answerable, "
           f"{meta['questions'] - len(answerable)} unanswerable) | app top_k={doc_k}\n")
 
@@ -425,10 +448,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git": git_revision(),
         "embedding_model": settings.EMBEDDING_MODEL,
+        "neighbor_window": settings.RETRIEVAL_NEIGHBOR_WINDOW or None,
+        "rerank": settings.RETRIEVAL_RERANKER_MODEL or None,
+        "rerank_candidates": settings.RETRIEVAL_RERANK_CANDIDATES if settings.RETRIEVAL_RERANKER_MODEL else None,
         "collection": settings.CHROMA_COLLECTION_NAME,
         "distance_metric": collection_metadata.get("hnsw:space", "l2 (default)"),
         "indexed_chunks": sum(chunk_counts.values()),
         "chunks_per_doc": chunk_counts,
+        # Measured from the stored chunks, so it shows which chunking the
+        # collection was built with, whatever the current env settings are.
+        "chunk_chars": chunk_char_stats(indexed_chunks),
         "questions": len(questions),
         "questions_file": str(args.questions),
         "ks": ks,

@@ -1,0 +1,67 @@
+Comparing  A: rerank_minilm_c15 (2026-11-03, git 4d78a3b)
+       ->  B: e4_rerank (2026-11-05, git 28601ea)
+
+Config differences
+  chunk_chars: (missing) -> {'mean': 978, 'p95': 1203, 'max': 1279, 'limit': 1200, 'o...
+  chunks_per_doc: {'GMM_BIC.pdf': 97, 'LINHAC_2022_Erik.pdf': 31, 'LINHAC_2... -> {'GMM_BIC.pdf': 64, 'LINHAC_2022_Erik.pdf': 21, 'LINHAC_2...
+  collection: research_documents -> research_documents_e4
+  git: 4d78a3b -> 28601ea
+  indexed_chunks: 313 -> 202
+
+Overall (answerable)
+  metric             A       B    delta
+  hit@1          0.696   0.646   -0.051
+  hit@3          0.785   0.709   -0.076
+  hit@5          0.835   0.759   -0.076
+  hit@10         0.886   0.823   -0.063
+  mrr@10         0.756   0.696   -0.060
+  doc_hit@3      0.899   0.911   +0.013
+
+Outcomes at k=3: 2 improved, 8 regressed, 12 rank changed, 57 unchanged
+
+Improved (miss -> hit at k=3) (2)
+  gmm_q07    paraphrased/body   LINHAC_2025.pdf          rank  - -> 1
+  ras_q14    paraphrased/body   MLSA23-RASMAS.pdf        rank  - -> 3
+
+Regressed (hit -> miss at k=3) (8)
+  bic_q10    paraphrased/body   GMM_BIC.pdf              rank  3 -> -
+  gmm_q04    direct/body        LINHAC_2025.pdf          rank  1 -> -
+  gmm_q05    direct/table       LINHAC_2025.pdf          rank  2 -> -
+  gmm_q16    direct/table       LINHAC_2025.pdf          rank  1 -> -
+  ras_q11    direct/body        MLSA23-RASMAS.pdf        rank  1 -> -
+  bic_q12    paraphrased/body   GMM_BIC.pdf              rank  2 -> 8
+  ras_q06    paraphrased/body   MLSA23-RASMAS.pdf        rank  1 -> 6
+  eri_q05    direct/table       LINHAC_2022_Erik.pdf     rank  1 -> 4
+
+Rank changed, same outcome at k=3 (12)
+  oli_q08    paraphrased/body   LINHAC_2024_Oliver.pdf   rank  5 -> -
+  oli_q14    paraphrased/body   LINHAC_2024_Oliver.pdf   rank  4 -> -
+  gmm_q03    direct/body        LINHAC_2025.pdf          rank  9 -> 4
+  bic_q14    paraphrased/body   GMM_BIC.pdf              rank  5 -> 7
+  gmm_q08    paraphrased/body   LINHAC_2025.pdf          rank  7 -> 5
+  oli_q04    direct/body        LINHAC_2024_Oliver.pdf   rank  8 -> 6
+  bic_q01    direct/body        GMM_BIC.pdf              rank  2 -> 1
+  bic_q05    direct/body        GMM_BIC.pdf              rank  2 -> 1
+  eri_q03    direct/body        LINHAC_2022_Erik.pdf     rank  2 -> 1
+  eri_q11    paraphrased/body   LINHAC_2022_Erik.pdf     rank  1 -> 2
+  eri_q12    direct/table       LINHAC_2022_Erik.pdf     rank  1 -> 2
+  gmm_q17    direct/table       LINHAC_2025.pdf          rank  1 -> 2
+
+Unanswerable top-1 score, lower is better (17)
+  unk_q06    near_miss  -3.958 -> -3.220  (+0.738)
+  gen_q02    near_miss  -1.816 -> -1.120  (+0.696)
+  unk_q05    near_miss  3.124 -> 3.563  (+0.439)
+  gen_q01    near_miss  -0.769 -> -0.511  (+0.258)
+  unk_q09    off_topic  -9.668 -> -9.550  (+0.117)
+  unk_q12    off_topic  -11.211 -> -11.153  (+0.058)
+  unk_q10    off_topic  -10.694 -> -10.657  (+0.036)
+  unk_q11    off_topic  -10.978 -> -10.960  (+0.018)
+  unk_q01    near_miss  -1.415 -> -1.415  (+0.000)
+  unk_q02    near_miss  0.526 -> 0.526  (+0.000)
+  unk_q07    near_miss  -0.429 -> -0.429  (+0.000)
+  unk_q08    near_miss  -5.010 -> -5.010  (+0.000)
+  gen_q03    near_miss  -10.631 -> -10.884  (-0.253)
+  oli_q10    near_miss  0.508 -> -0.095  (-0.603)
+  unk_q03    near_miss  2.646 -> 2.020  (-0.626)
+  gmm_q11    near_miss  -0.045 -> -0.801  (-0.756)
+  unk_q04    near_miss  -7.980 -> -9.127  (-1.147)

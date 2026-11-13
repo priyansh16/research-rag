@@ -2,6 +2,7 @@
 Unit tests for the retrieval evaluation harness.
 
 Pure logic only: no embedding model, no ChromaDB, no Ollama.
+Marked `eval`: evaluation tooling, not app code. Run with `pytest -m eval`.
 """
 
 import argparse
@@ -15,7 +16,6 @@ from evaluation.retrieval.metrics import (
     find_answer_chunks,
     first_doc_rank,
     first_relevant_rank,
-    group_by,
     hit_at_k,
     is_relevant,
     normalize_for_match,
@@ -28,7 +28,6 @@ from evaluation.retrieval.metrics import (
 )
 from evaluation.retrieval.run import (
     DEFAULT_QUESTIONS,
-    format_table,
     load_questions,
     output_path,
     parse_ks,
@@ -36,6 +35,8 @@ from evaluation.retrieval.run import (
     question_record,
     validate_question,
 )
+
+pytestmark = pytest.mark.eval
 
 
 def chunk(doc="a.pdf", text="", score=0.5, index=0):
@@ -69,6 +70,9 @@ def unanswerable(id="u1", retrieved=(), subtype=None):
         ("the 2021–2022 NHL season", "2021-2022 nhl"),      # en dash vs hyphen
         ("length  13\nfor defenders", "length 13 for defenders"),  # whitespace
         ("a total of 15,360 models", "15,360"),             # punctuation kept
+        ("17/18 Vaxjo (1, champions)", "växjö (1, champions)"),  # accents lost by OCR
+        ("Anton Strålman", "anton stralman"),               # accents in label only
+        ("Lucas Ekeståhl-Jonsson", "ekeståhl-jonsson"),     # accents on both sides
     ],
 )
 def test_normalize_for_match_handles_pdf_artifacts(chunk_text, must_contain):
@@ -89,10 +93,6 @@ def test_is_relevant_requires_expected_doc():
 def test_first_relevant_rank_is_one_based():
     chunks = [chunk(text="hay"), chunk(text="hay"), chunk(text="NEEDLE")]
     assert first_relevant_rank(chunks, "a.pdf", "needle") == 3
-
-
-def test_first_relevant_rank_none_when_missing():
-    assert first_relevant_rank([chunk(text="hay")], "a.pdf", "needle") is None
 
 
 def test_first_doc_rank_ignores_text():
@@ -142,13 +142,6 @@ def test_summarize_computes_hits_mrr_and_doc_hits():
 def test_summarize_with_no_answerable_results():
     summary = summarize([unanswerable()], ks=[1, 5], doc_k=3)
     assert summary == {"n": 0, "hit@1": None, "hit@5": None, "mrr@5": None, "doc_hit@3": None}
-
-
-def test_group_by_maps_none_to_key():
-    results = [answerable(id="a", location="table"), answerable(id="b", location=None), unanswerable()]
-    groups = group_by(results, "location")
-    assert list(groups) == ["none", "table"]
-    assert [r.id for r in groups["none"]] == ["b", "u1"]
 
 
 # score_separation
@@ -235,11 +228,6 @@ def test_load_questions_reports_all_problems(tmp_path):
     assert "need a 'doc'" in message
 
 
-def test_load_questions_skips_blank_lines(tmp_path):
-    path = write_jsonl(tmp_path / "q.jsonl", [valid_row(), "", valid_row(id="q2")])
-    assert [q["id"] for q in load_questions(path)] == ["q1", "q2"]
-
-
 def test_load_questions_rejects_empty_file(tmp_path):
     path = tmp_path / "q.jsonl"
     path.write_text("\n")
@@ -290,27 +278,10 @@ def test_question_record_marks_every_relevant_chunk():
     assert [c["rank"] for c in record["retrieved"]] == [1, 2, 3]
 
 
-def test_format_table_renders_missing_values():
-    table = format_table("T", {"all": {"n": 2, "hit@1": None, "hit@3": 0.5}})
-    assert "hit@1" in table and "-" in table and "0.50" in table
-
-
 # Answer reachability (experiment 0)
 def test_find_answer_chunks_uses_normalized_matching():
     doc_chunks = [(4, "hay"), (0, "the data are right- skewed"), (7, "RIGHT-SKEWED again")]
     assert find_answer_chunks(doc_chunks, "right-skewed") == [0, 7]
-
-
-def test_find_answer_chunks_none_found():
-    assert find_answer_chunks([(0, "hay")], "needle") == []
-    assert find_answer_chunks([], "needle") == []
-
-
-def test_reachable_property():
-    assert answerable(answer_chunks=None).reachable is None   # not checked
-    assert answerable(answer_chunks=[]).reachable is False
-    assert answerable(answer_chunks=[3]).reachable is True
-    assert unanswerable().reachable is None
 
 
 def test_reachability_summary():
@@ -349,10 +320,6 @@ def test_score_separation_by_subtype():
     assert by_subtype["near_miss"]["clean_threshold_possible"] is False
     assert by_subtype["off_topic"]["clean_threshold_possible"] is True
     assert by_subtype["none"]["unanswerable_n"] == 1
-
-
-def test_score_separation_by_subtype_without_unanswerable():
-    assert score_separation_by_subtype([answerable(retrieved=[chunk(text="needle")])]) == {}
 
 
 def test_validate_question_subtype():

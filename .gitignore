@@ -6,6 +6,7 @@
 /.python-version
 .DS_Store
 notes.md
+plan.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
