@@ -42,6 +42,16 @@ https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Generation is now reproducible: `GENERATION_TEMPERATURE` default 0.1 → 0, and every Ollama call sends a fixed
+  `GENERATION_SEED` (default 42) and an explicit `OLLAMA_NUM_CTX` (default 8192). Before, `num_ctx` was left to
+  Ollama's server default, which truncates longer prompts without an error. Update `.env` if it sets
+  `GENERATION_TEMPERATURE`.
+- The model declines with one fixed sentence (`REFUSAL_MESSAGE` in `prompt_builder.py`) when the context doesn't
+  contain the answer, instead of free wording. The no-chunks response uses the same sentence (was "I couldn't find
+  any relevant information…").
+- `OllamaClient.generate` returns an `OllamaGeneration` (text, `prompt_eval_count`, `eval_count`, durations,
+  `done_reason`) instead of a string, and logs the token counts. `GenerationResult` also carries the full-text
+  context chunks and token counts; the public API response is unchanged.
 - Retrieval now reranks by default: the app downloads the MiniLM cross-encoder (~90 MB) on first start, and the
   returned `score` is a cross-encoder logit (unbounded), not cosine similarity. Set `RETRIEVAL_RERANKER_MODEL=""` for
   vector-only retrieval.

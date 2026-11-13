@@ -11,6 +11,8 @@ the Mac app/installer). Pull a model first: `ollama pull llama3.2:3b`.
 """
 
 import time
+from dataclasses import dataclass
+from typing import Optional
 
 import httpx
 from loguru import logger
@@ -20,6 +22,40 @@ from src.core.config import settings
 
 class OllamaClientError(Exception):
     """Raised when the Ollama server is unreachable or returns an error."""
+
+
+@dataclass(frozen=True)
+class OllamaGeneration:
+    """
+    One /api/generate result: the text plus Ollama's own counters.
+
+    Every field except `text` is None when Ollama leaves it out of the
+    response. Durations are in nanoseconds, as Ollama reports them.
+    `prompt_eval_count` close to num_ctx means the prompt was probably
+    truncated; done_reason == "length" means the answer hit num_predict.
+    """
+
+    text: str
+    prompt_eval_count: Optional[int] = None
+    eval_count: Optional[int] = None
+    total_duration_ns: Optional[int] = None
+    load_duration_ns: Optional[int] = None
+    prompt_eval_duration_ns: Optional[int] = None
+    eval_duration_ns: Optional[int] = None
+    done_reason: Optional[str] = None
+
+    @classmethod
+    def from_response(cls, data: dict) -> "OllamaGeneration":
+        return cls(
+            text=(data.get("response") or "").strip(),
+            prompt_eval_count=data.get("prompt_eval_count"),
+            eval_count=data.get("eval_count"),
+            total_duration_ns=data.get("total_duration"),
+            load_duration_ns=data.get("load_duration"),
+            prompt_eval_duration_ns=data.get("prompt_eval_duration"),
+            eval_duration_ns=data.get("eval_duration"),
+            done_reason=data.get("done_reason"),
+        )
 
 
 
@@ -49,9 +85,14 @@ class OllamaClient:
         prompt: str,
         temperature: float | None = None,
         max_tokens: int | None = None,
-    ) -> str:
+    ) -> OllamaGeneration:
         """
-        Send a prompt to Ollama and return the generated text.
+        Send a prompt to Ollama and return the generated text with its
+        token counts and durations.
+
+        Sends a fixed seed and an explicit num_ctx so answers are
+        reproducible and long prompts aren't silently truncated by a
+        smaller server default.
 
         Retries on connection errors and timeouts with linear backoff.
         Does NOT retry on a 4xx from Ollama (e.g. model not found) —
@@ -76,6 +117,8 @@ class OllamaClient:
                     else settings.GENERATION_TEMPERATURE
                 ),
                 "num_predict": max_tokens or settings.GENERATION_MAX_TOKEN,
+                "seed": settings.GENERATION_SEED,
+                "num_ctx": settings.OLLAMA_NUM_CTX,
             },
         }
 
@@ -95,13 +138,18 @@ class OllamaClient:
                     )
                 response.raise_for_status()
 
-                data = response.json()
-                
+                result = OllamaGeneration.from_response(response.json())
+
                 latency_ms = (time.perf_counter() - generation_start) * 1000
                 logger.info(
-                    "Ollama response received | model={} | latency_ms={:.2f}",
+                    "Ollama response received | model={} | latency_ms={:.2f} | "
+                    "prompt_tokens={} | output_tokens={} | num_ctx={} | done_reason={}",
                     self.model,
                     latency_ms,
+                    result.prompt_eval_count,
+                    result.eval_count,
+                    settings.OLLAMA_NUM_CTX,
+                    result.done_reason,
                 )
                 
                 if attempt > 1:
@@ -110,7 +158,7 @@ class OllamaClient:
                         attempt,
                     )
                     
-                return data.get("response", "").strip()
+                return result
 
             except httpx.ConnectError as exc:
                 last_error = exc
