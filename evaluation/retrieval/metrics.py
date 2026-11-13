@@ -10,35 +10,13 @@ from the expected document AND its text contains the question's
 """
 
 import math
-import re
-import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
 from statistics import mean, median
 from typing import Dict, List, Optional, Sequence, Tuple
 
-
-# Whitespace plus every dash-like character PDF extraction produces:
-# hyphen-minus, soft hyphen, U+2010..U+2015 (hyphens, en/em dash, bar),
-# and the minus sign.
-_IGNORED_CHARS = re.compile(r"[\s\-­‐-―−]+")
-
-
-def normalize_for_match(text: str) -> str:
-    """
-    Normalize text for substring matching only (never for display).
-
-    - NFKD turns ligatures into plain letters ("ﬁnite" -> "finite") and
-      splits accented letters into base letter + combining mark
-    - dropping combining marks folds accents, because OCR'd tables lose
-      them ("Växjö" in the PDF is stored as "Vaxjo")
-    - casefold makes matching case-insensitive
-    - dropping whitespace and dashes makes line-break hyphenation
-      ("right- skewed", "member- ship") and spacing differences match
-    """
-    decomposed = unicodedata.normalize("NFKD", text)
-    unaccented = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return _IGNORED_CHARS.sub("", unaccented.casefold())
+# Shared with the generation evaluation; re-exported here for existing imports.
+from evaluation.common import normalize_for_match  # noqa: F401
 
 
 @dataclass(frozen=True)

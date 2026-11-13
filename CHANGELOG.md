@@ -10,6 +10,13 @@ https://keepachangelog.com/en/1.1.0/
 ## [Unreleased]
 
 ### Added
+- Generation evaluation, phase 1 (`evaluation/generation/run.py`): runs every question through
+  `GenerationService.generate()` and writes one row per question to `results/<date>_<label>.jsonl` as it goes
+  (answer, full context chunks, token counts, run config). Deterministic metrics in `evaluation/generation/metrics.py`:
+  correctness (`must_contain` in the answer), refusals (`REFUSAL_MESSAGE`) by unanswerable subtype, false refusals,
+  soft-refusal wording listed for review, gold chunk in context, retrieval vs generation miss, prompt truncation.
+- `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
+  loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers
   (79 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
   17 unanswerable, tagged `near_miss` / `off_topic`), run directly against `RetrievalService`;
