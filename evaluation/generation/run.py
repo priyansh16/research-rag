@@ -13,6 +13,10 @@ Settings come from the app config, so experiments are env vars:
     TOP_K_RESULTS=5 uv run python -m evaluation.generation.run --label gen_k5
 
 Needs Ollama running with OLLAMA_MODEL pulled, and the indexed documents.
+
+After a scoring-rule change, recompute the flags from the saved answers
+(no services, no Ollama; the answers are never regenerated):
+    uv run python -m evaluation.generation.run --rescore gen_k3
 """
 
 import argparse
@@ -33,11 +37,14 @@ from evaluation.common import (
     load_questions,
     output_path,
     parse_label,
+    resolve_run_path,
 )
 from evaluation.generation.metrics import (
+    SCORING_VERSION,
     attribute,
     gold_rank,
     is_correct,
+    is_exact_refusal,
     is_refusal,
     is_truncated,
     soft_refusal_phrases,
@@ -58,8 +65,11 @@ ANSWER_PREVIEW_CHARS = 120
 # CLI
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate and score answers for questions.jsonl.")
-    parser.add_argument("--label", type=parse_label, required=True,
-                        help=f"Name for this run; output is results/<date>_<label>{RESULTS_SUFFIX}")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--label", type=parse_label,
+                      help=f"Name for this run; output is results/<date>_<label>{RESULTS_SUFFIX}")
+    mode.add_argument("--rescore", metavar="LABEL_OR_PATH",
+                      help="Recompute the scores of an existing run in place, from its saved answers")
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--limit", type=int, default=None,
@@ -133,17 +143,10 @@ def build_row(
     One results row. `result` is a GenerationResult, or None when guardrails
     blocked the question (then `blocked_reason` says why).
     """
-    answerable = q["type"] != "unanswerable"
     blocked = result is None
-    answer = None if blocked else result.answer
-    context = [] if blocked else result.context_chunks
     ollama = None if blocked else result.ollama
-    prompt_tokens = None if blocked else result.prompt_eval_count
 
-    rank = gold_rank(context, q.get("doc"), q.get("must_contain"))
-    correct = is_correct(answer, q.get("must_contain"))
-
-    return {
+    row = {
         "id": q["id"],
         "type": q["type"],
         "subtype": q.get("subtype"),
@@ -151,26 +154,52 @@ def build_row(
         "question": q["question"],
         "doc": q.get("doc"),
         "must_contain": q.get("must_contain"),
-        "answerable": answerable,
+        "answerable": q["type"] != "unanswerable",
         "status": "blocked" if blocked else "ok",
         "blocked_reason": blocked_reason,
-        "answer": answer,
+        "answer": None if blocked else result.answer,
+        "latency_ms": round(latency_ms, 2),
+        "retrieval_latency_ms": None if blocked else result.retrieval_latency_ms,
+        "generation_latency_ms": None if blocked else result.generation_latency_ms,
+        "prompt_eval_count": None if blocked else result.prompt_eval_count,
+        "eval_count": None if blocked else result.eval_count,
+        "done_reason": ollama.done_reason if ollama else None,
+        "context": [] if blocked else result.context_chunks,
+        "config": config,
+    }
+    return score_row(row)
+
+
+# Derived fields; score_row recomputes all of them, nothing else.
+SCORE_FIELDS = (
+    "refused", "refusal_exact", "soft_refusal_phrases", "correct", "gold_rank",
+    "gold_in_context", "attribution", "truncated", "scoring_version",
+)
+
+
+def score_row(row: Dict) -> Dict:
+    """
+    (Re)compute every derived field from the row's saved inputs: answer,
+    context, labels, token count and num_ctx. Used for new rows and by
+    --rescore, so both always score the same way.
+    """
+    answer = row["answer"]
+    rank = gold_rank(row["context"], row.get("doc"), row.get("must_contain"))
+    correct = is_correct(answer, row.get("must_contain"))
+    blocked = row["status"] == "blocked"
+
+    scores = {
         "refused": is_refusal(answer),
+        "refusal_exact": is_exact_refusal(answer),
         "soft_refusal_phrases": soft_refusal_phrases(answer),
         "correct": correct,
         "gold_rank": rank,
         "gold_in_context": rank is not None,
-        "attribution": attribute(answerable, blocked, correct, rank is not None),
-        "latency_ms": round(latency_ms, 2),
-        "retrieval_latency_ms": None if blocked else result.retrieval_latency_ms,
-        "generation_latency_ms": None if blocked else result.generation_latency_ms,
-        "prompt_eval_count": prompt_tokens,
-        "eval_count": None if blocked else result.eval_count,
-        "done_reason": ollama.done_reason if ollama else None,
-        "truncated": is_truncated(prompt_tokens, config["num_ctx"]),
-        "context": context,
-        "config": config,
+        "attribution": attribute(row["answerable"], blocked, correct, rank is not None),
+        "truncated": is_truncated(row.get("prompt_eval_count"), row["config"]["num_ctx"]),
+        "scoring_version": SCORING_VERSION,
     }
+    return {**row, **scores}
 
 
 # Run
@@ -236,6 +265,7 @@ def _preview(text: Optional[str]) -> str:
 
 def format_summary(summary: Dict, rows: List[Dict], config: Dict) -> str:
     ans, unans, attr = summary["answerable"], summary["unanswerable"], summary["attribution"]
+    refusals = summary["refusals"]
     by_id = {r["id"]: r for r in rows}
     lines = [
         f"\nGeneration evaluation: {config['label']}  ({config['timestamp']}, git {config['git']})",
@@ -245,12 +275,16 @@ def format_summary(summary: Dict, rows: List[Dict], config: Dict) -> str:
         f"| reranker={config['reranker']} | neighbor_window={config['neighbor_window']}",
         f"  questions: {summary['n']} ({ans['n']} answerable, {unans['n']} unanswerable)",
         "",
-        f"Answerable ({ans['n']}): correct {ans['correct']} | false refusals {ans['false_refusals']} "
+        f"Answerable ({ans['n']}): correct {ans['correct']} (strict must_contain match) "
         f"| gold chunk in context {ans['gold_in_context']}",
+        f"  false refusals {ans['false_refusals']}: gold in context {ans['false_refusals_gold_in_context']} "
+        f"| retrieval miss {ans['false_refusals_retrieval_miss']}",
         f"  wrong answers: retrieval miss {attr['retrieval_miss']} | generation miss {attr['generation_miss']} "
         f"| blocked {attr['blocked']}",
         f"Unanswerable ({unans['n']}): refused {unans['refused']}"
         + "".join(f" | {name} {s['refused']}/{s['n']}" for name, s in unans["by_subtype"].items()),
+        f"Refusals: {refusals['n']} | exact refusal sentence {refusals['exact_sentence']}/{refusals['n']} "
+        f"(scoring v{SCORING_VERSION})",
         "",
         f"Latency ms (after warm-up): {_stats_line(summary['latency_ms'])}",
         f"Prompt tokens: {_stats_line(summary['prompt_tokens'])} (num_ctx {config['num_ctx']}) "
@@ -273,9 +307,12 @@ def format_summary(summary: Dict, rows: List[Dict], config: Dict) -> str:
             lambda r: f"[{r['subtype']}] {_preview(r['answer'])}")
     section("False refusals", false_refusals,
             lambda r: f"gold_rank={_fmt(r['gold_rank'])}")
+    section("Reworded refusals to review (counted as refusals: refusal wording, no citation)",
+            summary["reworded_refusal_ids"],
+            lambda r: _preview(r["answer"]))
     section("Generation misses (gold chunk in context, answer wrong)", generation_misses,
             lambda r: f"gold_rank={r['gold_rank']} want '{r['must_contain']}' | {_preview(r['answer'])}")
-    section("Soft refusals to review (not counted as refusals)", summary["soft_refusal_ids"],
+    section("Soft refusals to review (cited, so not counted as refusals)", summary["soft_refusal_ids"],
             lambda r: f"{r['soft_refusal_phrases']} | {_preview(r['answer'])}")
     section("Truncated prompts", summary["truncated_ids"],
             lambda r: f"prompt_tokens={r['prompt_eval_count']}")
@@ -325,9 +362,50 @@ async def run(args: argparse.Namespace) -> int:
     return 0
 
 
+def load_rows(path: Path) -> List[Dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def changed_fields(old_rows: List[Dict], new_rows: List[Dict]) -> Dict[str, List[str]]:
+    """{field: [question ids whose value changed]} over the score fields."""
+    changes: Dict[str, List[str]] = {}
+    for old, new in zip(old_rows, new_rows):
+        for name in SCORE_FIELDS:
+            if old.get(name) != new.get(name):
+                changes.setdefault(name, []).append(new["id"])
+    return changes
+
+
+def rescore(arg: str, out_dir: Path) -> int:
+    """Recompute the score fields of a saved run in place; answers are untouched."""
+    path = resolve_run_path(arg, out_dir, suffix=RESULTS_SUFFIX)
+    old_rows = load_rows(path)
+    if not old_rows:
+        print(f"{path} has no rows", file=sys.stderr)
+        return 1
+    new_rows = [score_row(row) for row in old_rows]
+
+    # Write to a temp file first, so an error can't leave a half-written run.
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in new_rows), encoding="utf-8")
+    tmp.replace(path)
+
+    print(format_summary(summarize(new_rows), new_rows, new_rows[0]["config"]))
+    changes = changed_fields(old_rows, new_rows)
+    print(f"Rescored {path} with scoring v{SCORING_VERSION}. Changed fields:")
+    for name, ids in changes.items():
+        if name != "scoring_version":
+            print(f"  {name:<22} {len(ids):>3}  {', '.join(ids)}")
+    if not any(name != "scoring_version" for name in changes):
+        print("  none")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     configure_logging(args.verbose)
+    if args.rescore:
+        return rescore(args.rescore, args.out_dir)
     return asyncio.run(run(args))
 
 

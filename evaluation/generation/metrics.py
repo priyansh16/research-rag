@@ -4,9 +4,14 @@ Deterministic generation-evaluation metrics (no LLM judge).
 Pure functions over strings and result rows: no services, no I/O, so all of
 it is unit-testable without Ollama.
 
-- refusal:     the answer contains REFUSAL_MESSAGE (after normalize_for_match)
-- soft refusal: refusal-like wording ("not mentioned", ...) in an answer that
-               is NOT a refusal. Listed for review, never counted as a refusal.
+- refusal:     the answer contains REFUSAL_MESSAGE (after normalize_for_match),
+               or it has refusal wording ("does not contain", ...) and no [n]
+               citation. In G0 every refusal-like answer had no citation and
+               every real answer had one; the model often rewords the fixed
+               sentence ("The provided context does not contain ...").
+- exact refusal: the answer uses REFUSAL_MESSAGE itself (prompt compliance).
+- soft refusal: refusal wording in an answer that IS cited, so not a refusal.
+               Listed for review, never counted as a refusal.
 - correctness: an answerable question's `must_contain` is in the answer
                (after normalize_for_match)
 - gold rank:   1-based position of the first context chunk that is relevant
@@ -16,6 +21,7 @@ it is unit-testable without Ollama.
 - truncation:  prompt_eval_count within a margin of num_ctx
 """
 
+import re
 from typing import Dict, List, Optional, Sequence
 
 from evaluation.common import normalize_for_match
@@ -23,10 +29,17 @@ from evaluation.retrieval.metrics import RetrievedChunk, is_relevant, percentile
 from src.services.generation.prompt_builder import REFUSAL_MESSAGE
 
 
-# Refusal-like phrases that don't use the fixed sentence. Checked after
+# Bump when a scoring rule changes, so rescored and old rows can't be mixed up.
+# 1: exact-sentence refusals only. 2: + reworded refusals without citations.
+SCORING_VERSION = 2
+
+# A citation marker like [1] or [12].
+_CITATION = re.compile(r"\[\d+\]")
+
+# Refusal wording other than the fixed sentence. Checked after
 # normalize_for_match, so case and spacing don't matter. Curly apostrophes
 # are folded to straight ones first (see _normalize).
-SOFT_REFUSAL_PHRASES = (
+REFUSAL_PHRASES = (
     "not mentioned",
     "does not mention",
     "do not mention",
@@ -42,8 +55,11 @@ SOFT_REFUSAL_PHRASES = (
     "not specified",
     "not provided",
     "not stated",
+    "not explicitly",
     "no information",
     "not enough information",
+    "don't have enough information",
+    "do not have enough information",
     "cannot be determined",
     "can't be determined",
     "unable to answer",
@@ -69,17 +85,35 @@ _REFUSAL_NEEDLE = _normalize(REFUSAL_MESSAGE)
 
 
 # Per answer
-def is_refusal(answer: Optional[str]) -> bool:
+def has_citation(answer: Optional[str]) -> bool:
+    return bool(answer) and bool(_CITATION.search(answer))
+
+
+def is_exact_refusal(answer: Optional[str]) -> bool:
     """The answer starts with or contains the fixed refusal sentence."""
     return bool(answer) and _REFUSAL_NEEDLE in _normalize(answer)
 
 
-def soft_refusal_phrases(answer: Optional[str]) -> List[str]:
-    """Refusal-like phrases in an answer that is not a refusal (empty for refusals)."""
-    if not answer or is_refusal(answer):
+def refusal_phrases(answer: Optional[str]) -> List[str]:
+    """Every refusal phrase in the answer, cited or not."""
+    if not answer:
         return []
     text = _normalize(answer)
-    return [phrase for phrase in SOFT_REFUSAL_PHRASES if _normalize(phrase) in text]
+    return [phrase for phrase in REFUSAL_PHRASES if _normalize(phrase) in text]
+
+
+def is_refusal(answer: Optional[str]) -> bool:
+    """The fixed sentence, or refusal wording with no [n] citation."""
+    if is_exact_refusal(answer):
+        return True
+    return bool(refusal_phrases(answer)) and not has_citation(answer)
+
+
+def soft_refusal_phrases(answer: Optional[str]) -> List[str]:
+    """Refusal phrases in an answer that is not a refusal (empty for refusals)."""
+    if is_refusal(answer):
+        return []
+    return refusal_phrases(answer)
 
 
 def is_correct(answer: Optional[str], must_contain: Optional[str]) -> Optional[bool]:
@@ -166,12 +200,22 @@ def summarize(rows: Sequence[Dict]) -> Dict:
         )
     }
 
+    refusals = [r for r in rows if r["refused"]]
+
     return {
         "n": len(rows),
         "answerable": {
             "n": len(answerable),
             "correct": _count(answerable, lambda r: r["correct"]),
             "false_refusals": _count(answerable, lambda r: r["refused"]),
+            # Gold chunk was in the context: the model had the answer and refused.
+            "false_refusals_gold_in_context": _count(
+                answerable, lambda r: r["refused"] and r["gold_in_context"]
+            ),
+            # Gold chunk missing: refusing is the honest outcome of a retrieval miss.
+            "false_refusals_retrieval_miss": _count(
+                answerable, lambda r: r["refused"] and not r["gold_in_context"]
+            ),
             "gold_in_context": _count(answerable, lambda r: r["gold_in_context"]),
         },
         "unanswerable": {
@@ -179,7 +223,12 @@ def summarize(rows: Sequence[Dict]) -> Dict:
             "refused": _count(unanswerable, lambda r: r["refused"]),
             "by_subtype": by_subtype,
         },
+        "refusals": {
+            "n": len(refusals),
+            "exact_sentence": _count(refusals, lambda r: r["refusal_exact"]),
+        },
         "attribution": attribution,
+        "reworded_refusal_ids": [r["id"] for r in refusals if not r["refusal_exact"]],
         "soft_refusal_ids": [r["id"] for r in rows if r["soft_refusal_phrases"]],
         "blocked_ids": [r["id"] for r in rows if r["status"] == "blocked"],
         "truncated_ids": [r["id"] for r in rows if r["truncated"]],

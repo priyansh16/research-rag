@@ -15,6 +15,9 @@ https://keepachangelog.com/en/1.1.0/
   (answer, full context chunks, token counts, run config). Deterministic metrics in `evaluation/generation/metrics.py`:
   correctness (`must_contain` in the answer), refusals (`REFUSAL_MESSAGE`) by unanswerable subtype, false refusals,
   soft-refusal wording listed for review, gold chunk in context, retrieval vs generation miss, prompt truncation.
+  Scoring v2: reworded refusals without a `[n]` citation also count as refusals (the exact-sentence count is kept as
+  prompt compliance); false refusals are split by whether the gold chunk was in the context. `--rescore <label>`
+  recomputes the scores of a saved run from its answers, without regenerating.
 - `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
   loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers

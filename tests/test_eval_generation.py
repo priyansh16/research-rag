@@ -5,19 +5,23 @@ Pure logic only: no embedding model, no ChromaDB, no Ollama.
 Marked `eval`: evaluation tooling, not app code. Run with `pytest -m eval`.
 """
 
+import json
+
 import pytest
 
 from evaluation.common import output_path, resolve_run_path, run_label
 from evaluation.generation.metrics import (
+    SCORING_VERSION,
     attribute,
     gold_rank,
     is_correct,
+    is_exact_refusal,
     is_refusal,
     is_truncated,
     soft_refusal_phrases,
     summarize,
 )
-from evaluation.generation.run import build_row, format_summary
+from evaluation.generation.run import build_row, format_summary, load_rows, main
 from src.services.generation.generation_service import GenerationResult
 from src.services.generation.ollama_client import OllamaGeneration
 from src.services.generation.prompt_builder import REFUSAL_MESSAGE
@@ -41,10 +45,31 @@ def test_not_a_refusal(answer):
     assert not is_refusal(answer)
 
 
-def test_soft_refusal_flags_wording_but_not_refusals():
-    assert soft_refusal_phrases("The salary is not mentioned in the context.") == ["not mentioned"]
-    assert soft_refusal_phrases("The text doesn’t mention hardware.") == ["doesn't mention"]  # curly apostrophe
-    assert soft_refusal_phrases(REFUSAL_MESSAGE) == []
+# Reworded refusals seen in G0: refusal wording and no citation.
+@pytest.mark.parametrize("answer", [
+    "The provided context does not contain enough information to answer this question.",
+    "The provided context does not contain information about the salaries of the players.",
+    "I don't have enough information to answer this question.",
+    "The answer cannot be determined from the provided context.",
+    "The SHL CF/60 in the 19/20 season is not explicitly stated in the provided context.",
+    "The text doesn’t mention hardware.",  # curly apostrophe
+])
+def test_reworded_refusal_without_citation_counts(answer):
+    assert is_refusal(answer)
+    assert not is_exact_refusal(answer)
+    assert soft_refusal_phrases(answer) == []
+
+
+def test_exact_refusal_is_flagged_separately():
+    assert is_exact_refusal(REFUSAL_MESSAGE)
+    assert is_exact_refusal("Sorry. " + REFUSAL_MESSAGE)
+
+
+def test_cited_answer_with_refusal_wording_is_soft_not_refusal():
+    answer = ("According to Table 5 in [1], D3.19-24 has 42 players. The specific defenders "
+              "are not explicitly listed in the provided context.")
+    assert not is_refusal(answer)
+    assert soft_refusal_phrases(answer) == ["not explicitly"]
     assert soft_refusal_phrases("They used 15,360 configurations [1].") == []
 
 
@@ -143,25 +168,70 @@ def test_summary_counts_and_report():
                   result=result("15,360 [1].", [ctx("a.pdf", "15,360")])),
         build_row({**ANSWERABLE, "id": "a2"}, CONFIG, 200.0,
                   result=result("It is not mentioned.", [ctx("b.pdf", "other")], prompt_tokens=8150)),
+        build_row({**ANSWERABLE, "id": "a3"}, CONFIG, 250.0,
+                  result=result(REFUSAL_MESSAGE, [ctx("a.pdf", "grid of 15,360")])),
+        build_row({**ANSWERABLE, "id": "a4"}, CONFIG, 260.0,
+                  result=result("It is 7 [1], the rest is not mentioned.", [ctx("b.pdf", "other")])),
         build_row(UNANSWERABLE, CONFIG, 300.0, result=result(REFUSAL_MESSAGE, [ctx("a.pdf", "x")])),
         build_row({**UNANSWERABLE, "id": "u2", "subtype": "off_topic"}, CONFIG, 400.0,
                   result=result("Paris [1].", [ctx("a.pdf", "x")], done_reason="length")),
     ]
     s = summarize(rows)
 
-    assert s["answerable"] == {"n": 2, "correct": 1, "false_refusals": 0, "gold_in_context": 1}
+    assert s["answerable"] == {
+        "n": 4, "correct": 1, "false_refusals": 2,
+        "false_refusals_gold_in_context": 1, "false_refusals_retrieval_miss": 1,
+        "gold_in_context": 2,
+    }
     assert s["unanswerable"]["refused"] == 1
     assert s["unanswerable"]["by_subtype"] == {"near_miss": {"n": 1, "refused": 1},
                                                "off_topic": {"n": 1, "refused": 0}}
-    assert s["attribution"]["retrieval_miss"] == 1
-    assert s["soft_refusal_ids"] == ["a2"]
+    assert s["refusals"] == {"n": 3, "exact_sentence": 2}
+    assert s["reworded_refusal_ids"] == ["a2"]
+    assert s["attribution"] == {"correct": 1, "retrieval_miss": 2, "generation_miss": 1, "blocked": 0}
+    assert s["soft_refusal_ids"] == ["a4"]
     assert s["truncated_ids"] == ["a2"]
     assert s["hit_num_predict_ids"] == ["u2"]
     assert s["latency_ms"]["max"] == 400.0
 
     report = format_summary(s, rows, CONFIG)
     assert "Unanswerable but answered (1)" in report
+    assert "Reworded refusals to review" in report
     assert "Soft refusals to review" in report
+
+
+# Rescoring
+def test_rescore_recomputes_scores_in_place_and_keeps_answers(tmp_path, capsys):
+    row = build_row(UNANSWERABLE, CONFIG, 300.0, result=result(
+        "The provided context does not contain enough information to answer this question.",
+        [ctx("a.pdf", "x")]))
+    # What scoring v1 wrote for this answer: not a refusal, no refusal_exact field.
+    v1_row = {k: v for k, v in row.items() if k != "refusal_exact"}
+    v1_row.update(refused=False, soft_refusal_phrases=["does not contain"], scoring_version=1)
+    path = tmp_path / "2026-11-13_gen_k3.jsonl"
+    path.write_text(json.dumps(v1_row) + "\n")
+
+    assert main(["--rescore", "gen_k3", "--out-dir", str(tmp_path)]) == 0
+
+    [new] = load_rows(path)
+    assert new["refused"] is True
+    assert new["refusal_exact"] is False
+    assert new["soft_refusal_phrases"] == []
+    assert new["scoring_version"] == SCORING_VERSION
+    assert new["answer"] == v1_row["answer"]
+    assert new["context"] == v1_row["context"]
+    out = capsys.readouterr().out
+    assert "refused" in out and "u1" in out
+
+
+def test_rescore_twice_changes_nothing(tmp_path, capsys):
+    path = tmp_path / "2026-11-13_gen_k3.jsonl"
+    row = build_row(ANSWERABLE, CONFIG, 1.0, result=result("15,360 [1].", [ctx("a.pdf", "15,360")]))
+    path.write_text(json.dumps(row) + "\n")
+
+    assert main(["--rescore", "gen_k3", "--out-dir", str(tmp_path)]) == 0
+    assert load_rows(path) == [row]
+    assert "Changed fields:\n  none" in capsys.readouterr().out
 
 
 # Shared run naming
