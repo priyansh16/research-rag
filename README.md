@@ -142,7 +142,7 @@ Grounded Response
 - FastAPI dependency injection with application-scoped service
   lifecycle (one shared instance per service, built once at startup)
 - Retrieval evaluation harness: hit@k, MRR and answer reachability on a
-  96-question golden set, with run-to-run comparison per question
+  96-question golden set, with run-to-run comparison per question; [Retrieval Evaluation](#retrieval-evaluation)
 - Generation evaluation: correctness, refusals, faithfulness (LLM judge) and
   cost per question, through the app's own generation call; see
   [Generation Evaluation](#generation-evaluation)
@@ -178,7 +178,7 @@ run directly against `RetrievalService` with no HTTP and no LLM.
 | E0 | Answer reachability | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
 | E1 | BGE query prefix | | | | | | | Not adopted, no effect (v1 set only) |
 | E3 | **Reranker: MiniLM-L-6, 15 candidates** | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted** (bge-reranker-base: 6 regressions, 3× slower) |
-| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current setup** |
+| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current retrieval setup** |
 | E4 | Chunking: less overlap, split long elements (+ text-layer tables) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6; overlap was adding recall |
 
 Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
@@ -209,7 +209,7 @@ window. An LLM judge (Claude Sonnet via `claude -p`) checks each answer twice:
 
 | # | Context chunks | Correct (of 79) | Unanswerable refused (of 17) | Faithfulness | Prompt tokens p50 | Latency p50 / p95 | Verdict |
 |---|---|---|---|---|---|---|---|
-| G0 | **k = 3** | **51** (+1 partial) | **17** | **0.914** | 1,178 | 2.9 s / 5.3 s | **Current setup** |
+| G0 | **k = 3** | **51** (+1 partial) | **17** | **0.914** | 1,178 | 2.9 s / 5.3 s | **Current generation setup** |
 | G1 | k = 5 | 55 (+3 partial) | 17 | 0.881 | 1,938 | 4.8 s / 10.0 s | Not adopted: +4 correct for +63% tokens, ~2× p95, less grounded |
 
 - With the right chunk in context, the model answers correctly 80% of the time (51/64), and it never answers
