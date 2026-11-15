@@ -18,6 +18,12 @@ https://keepachangelog.com/en/1.1.0/
   Scoring v2: reworded refusals without a `[n]` citation also count as refusals (the exact-sentence count is kept as
   prompt compliance); false refusals are split by whether the gold chunk was in the context. `--rescore <label>`
   recomputes the scores of a saved run from its answers, without regenerating.
+- Generation evaluation, phase 2 (`evaluation/generation/judge.py`): Claude Sonnet via `claude -p` (Pro plan, no API
+  key) judges each non-refusal answer for faithfulness (claims supported by the context) and correctness
+  (correct / partial / incorrect against the reference excerpt), 6 answers per call with a JSON schema. Appends to
+  `results/<date>_<label>.judged.jsonl` batch by batch and resumes after interruptions; retries a failed batch once;
+  stops if the resolved judge model changes; logs token usage per call. `--max-batches` for a cost check,
+  `--sample N` writes a hand-check sheet, `--agreement` counts the ticked boxes.
 - `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
   loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers

@@ -367,11 +367,17 @@ def load_rows(path: Path) -> List[Dict]:
 
 
 def changed_fields(old_rows: List[Dict], new_rows: List[Dict]) -> Dict[str, List[str]]:
-    """{field: [question ids whose value changed]} over the score fields."""
+    """
+    {field: [question ids whose value changed]} over the score fields.
+    A field the old row didn't have is reported as "<field> (new)", so a
+    new field doesn't look like 96 changed values.
+    """
     changes: Dict[str, List[str]] = {}
     for old, new in zip(old_rows, new_rows):
         for name in SCORE_FIELDS:
-            if old.get(name) != new.get(name):
+            if name not in old:
+                changes.setdefault(f"{name} (new)", []).append(new["id"])
+            elif old[name] != new.get(name):
                 changes.setdefault(name, []).append(new["id"])
     return changes
 
@@ -393,10 +399,11 @@ def rescore(arg: str, out_dir: Path) -> int:
     print(format_summary(summarize(new_rows), new_rows, new_rows[0]["config"]))
     changes = changed_fields(old_rows, new_rows)
     print(f"Rescored {path} with scoring v{SCORING_VERSION}. Changed fields:")
-    for name, ids in changes.items():
-        if name != "scoring_version":
-            print(f"  {name:<22} {len(ids):>3}  {', '.join(ids)}")
-    if not any(name != "scoring_version" for name in changes):
+    shown = {name: ids for name, ids in changes.items() if not name.startswith("scoring_version")}
+    for name, ids in shown.items():
+        listed = f"all {len(ids)} rows" if name.endswith("(new)") else ", ".join(ids)
+        print(f"  {name:<28} {len(ids):>3}  {listed}")
+    if not shown:
         print("  none")
     return 0
 
