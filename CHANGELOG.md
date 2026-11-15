@@ -24,6 +24,11 @@ https://keepachangelog.com/en/1.1.0/
   `results/<date>_<label>.judged.jsonl` batch by batch and resumes after interruptions; retries a failed batch once;
   stops if the resolved judge model changes; logs token usage per call. `--max-batches` for a cost check,
   `--sample N` writes a hand-check sheet, `--agreement` counts the ticked boxes.
+- `evaluation/generation/compare_runs.py`: question-by-question comparison of two generation runs. Outcomes come from
+  the judge when both runs are fully judged, otherwise both use the strict match. Lists Improved / Regressed /
+  Changed-without-score-change (e.g. honest refusal → wrong answer) with gold rank and faithfulness, plus a side-by-side
+  table of quality and cost (prompt tokens, latency, correct answers per 1k prompt tokens). Refuses to compare runs
+  with different questions, scoring versions or judge model/prompt.
 - `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
   loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers
