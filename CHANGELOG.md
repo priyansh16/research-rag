@@ -29,6 +29,10 @@ https://keepachangelog.com/en/1.1.0/
   Changed-without-score-change (e.g. honest refusal → wrong answer) with gold rank and faithfulness, plus a side-by-side
   table of quality and cost (prompt tokens, latency, correct answers per 1k prompt tokens). Refuses to compare runs
   with different questions, scoring versions or judge model/prompt.
+- `evaluation/generation/EXPERIMENTS.md`: G0 (k=3: 51/79 judged correct, 17/17 unanswerable refused, faithfulness
+  0.914) and G1 (k=5: not adopted; +4 correct for +63% prompt tokens and ~2× p95 latency, faithfulness 0.881).
+  `TOP_K_RESULTS` stays 3. Judge hand check: claims 15/15, correctness 14/15. README results table and DEVLOG
+  "Generation Evaluation" section.
 - `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
   loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers

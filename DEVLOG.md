@@ -332,3 +332,57 @@ Each experiment's hypothesis, setup, results and decision is recorded in
   - hit@k rewards redundant copies and doesn't see wasted context; generation eval should check whether the
     duplicated chunks hurt answers.
   - Check what a table actually looks like in each paper before "fixing" tables globally; the problem was paper-specific.
+
+---
+
+## Generation Evaluation
+
+Hypotheses, results and decisions per run are in
+[`evaluation/generation/EXPERIMENTS.md`](evaluation/generation/EXPERIMENTS.md).
+
+### App changes first (2026-11-13)
+- Made generation reproducible as app defaults rather than eval overrides: temperature 0.1 → 0, fixed seed, explicit
+  `num_ctx` 8192. Ollama's default window is set by the server, and it truncates longer prompts without an error.
+- One `REFUSAL_MESSAGE` used by the prompt, the no-chunks path and the eval. No apostrophe on purpose: models write a
+  curly ’ that substring matching misses.
+- `OllamaClient` returns token counts; `GenerationService` exposes the full context chunks internally. The eval calls
+  the app's own `generate()` instead of rebuilding the pipeline; the public API schema didn't change.
+- Learning: the local `.env` overrode the new temperature default. Check `.env` whenever a default changes.
+
+### G0 (k=3) and the scoring fixes
+- Strict `must_contain` matching scored 42/79; reading the rows showed it was wrong both ways: 11 correct answers
+  failed on format (bullets, "263" vs "263 (out of 345)") and 1 wrong answer passed (right number, wrong league).
+  Labels written to find a chunk aren't answer keys. The LLM judge became the headline (51/79).
+- The 3B model rewords the fixed refusal ("The provided *context* does not contain…"): only 20 of 34 refusals used
+  the exact sentence. Rule that worked: refusal wording **and no `[n]` citation** (no refusal cited a source; every
+  real answer did). With it: 17/17 unanswerable refused, not 12.
+- Added `--rescore` so a scoring change never needs regenerating; every row records its `scoring_version`.
+- The 15 "retrieval misses" are exactly the retrieval eval's misses at k=3 (hit@3 64). The retrieval table's
+  hit@10 69 isn't what the model sees.
+- With the gold chunk in context the model is right 80% of the time (51/64), and it's never right without it.
+  Losses: retrieval 15, generation 13 (6 wrong, 7 refused despite the gold chunk at rank 1).
+- Faithfulness 0.914. The made-up answers are table misreads (OCR'd grids, wrong paper's table).
+
+### Judge (claude -p, Pro plan)
+- `--bare` can't be used: it only accepts `ANTHROPIC_API_KEY`, not the Pro plan's OAuth. Used `--tools ""`,
+  `--system-prompt`, `--json-schema`, run from an empty temp dir so no project CLAUDE.md / memory leaks in.
+- ~11.4k input / 0.8k output tokens per 6-answer call, ~134k per run at k=3. Measured on 3 batches before the full run.
+- Pinned the resolved model (`claude-sonnet-5-5`): the `sonnet` alias can move between runs.
+- Two checks, two questions: faithfulness (vs the context) and correctness (vs the paper). An answer can be faithful
+  and wrong (retrieval miss, oli_q07) or correct with an invented detail (gmm_q09).
+- Hand check, 15 answers: claims 15/15, correctness 14/15. The one disagreement (eri_q13, "CF% of 1" accepted as
+  correct) is the leniency expected from showing the judge the reference.
+- Learning: report the hand check as it came out. A perfect score on 15 items is credible when the sheet is published.
+
+### G1 (k=5): not adopted (2026-11-15)
+- +4 correct (8 improved, 3 regressed) for +63% prompt tokens, p50 2.9 → 4.8 s, p95 5.3 → 10.0 s.
+- Only 2 gains came from the extra chunks; the rest were the model refusing less with the same gold chunk.
+- More context hurt grounding: faithfulness 0.914 → 0.881, and 0.90 → 0.55 for answers given after a retrieval miss.
+  Overlapping hockey papers got mixed (oli_q01, ras_q11), and honest refusals became confident wrong answers.
+- Learnings:
+  - More context makes a small model more willing to answer, not more accurate: right-when-answering fell 82% → 77%.
+  - Decide the rule before the run. Writing "faithfulness must not drop, cost must be worth it" first made the
+    call easy when correctness alone looked like a win.
+  - The bigger lever is the refusal instruction (7 refusals with the answer at rank 1), not k.
+- Found while hand-checking: duplicate paragraphs in non-adjacent chunks (MLSA23-RASMAS #27/#29) waste context slots
+  and position-based dedup can't catch them; one ambiguous question (bic_q12). Both on the backlog.
