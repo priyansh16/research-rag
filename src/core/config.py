@@ -44,8 +44,15 @@ class Settings(BaseSettings):
     OLLAMA_TIMEOUT_SECONDS: float = 60.0
     OLLAMA_MAX_RETRIES: int = 2
     GENERATION_MAX_CONTEXT_CHUNKS: int = 5      # how many retrieved chunks to feed the LLM
-    GENERATION_TEMPERATURE: float = 0.1         # low temp: grounded, less creative drift
+    # Temperature 0 + fixed seed: the same prompt gives the same answer, so
+    # evaluation runs are reproducible and grounded answers don't drift.
+    GENERATION_TEMPERATURE: float = 0.0
+    GENERATION_SEED: int = 42
     GENERATION_MAX_TOKEN: int = 512
+    # Context window sent to Ollama. Set explicitly: Ollama truncates prompts
+    # longer than its default window without an error, and 5 long chunks plus
+    # the instructions can pass 4k tokens.
+    OLLAMA_NUM_CTX: int = 8192
 
     # --- Guardrails ---
     GUARDRAILS_MAX_QUERY_LENGTH: int = 1000

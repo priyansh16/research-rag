@@ -22,8 +22,13 @@ from typing import Dict, List, Optional
 from loguru import logger
 
 from src.core.config import settings
-from src.services.generation.ollama_client import OllamaClient, OllamaClientError
+from src.services.generation.ollama_client import (
+    OllamaClient,
+    OllamaClientError,
+    OllamaGeneration,
+)
 from src.services.generation.prompt_builder import (
+    REFUSAL_MESSAGE,
     build_generation_prompt,
     build_sources_list,
 )
@@ -42,6 +47,12 @@ class GenerationBlockedError(Exception):
 
 @dataclass
 class GenerationResult:
+    """
+    Internal result. The API response is built from the first seven fields
+    only; the rest (full context chunks, Ollama counters) are for logging
+    and evaluation and never leave the service through the public schema.
+    """
+
     query: str
     answer: str
     sources: List[Dict] = field(default_factory=list)
@@ -49,6 +60,26 @@ class GenerationResult:
     generation_latency_ms: float = 0.0
     total_latency_ms: float = 0.0
     chunks_used: int = 0
+    # Chunks sent to the model, in citation order:
+    # {"document_name", "chunk_index", "score", "text"} with the full text.
+    context_chunks: List[Dict] = field(default_factory=list)
+    # None when Ollama wasn't called (no chunks) or left the field out.
+    prompt_eval_count: Optional[int] = None
+    eval_count: Optional[int] = None
+    ollama: Optional[OllamaGeneration] = None
+
+
+def to_context_chunks(chunks: List[Dict]) -> List[Dict]:
+    """Full-text view of the chunks sent to the model, in citation order."""
+    return [
+        {
+            "document_name": chunk.get("metadata", {}).get("document_name"),
+            "chunk_index": chunk.get("metadata", {}).get("chunk_index"),
+            "score": chunk.get("score"),
+            "text": chunk.get("chunks", ""),
+        }
+        for chunk in chunks
+    ]
 
 
 class GenerationService:
@@ -103,10 +134,7 @@ class GenerationService:
             total_latency_ms = (time.perf_counter() - total_start) * 1000
             return GenerationResult(
                 query=query,
-                answer=(
-                    "I couldn't find any relevant information in the indexed "
-                    "documents to answer this question."
-                ),
+                answer=REFUSAL_MESSAGE,
                 sources=[],
                 retrieval_latency_ms=round(retrieval_latency_ms, 2),
                 generation_latency_ms=0.0,
@@ -124,7 +152,7 @@ class GenerationService:
 
         generation_start = time.perf_counter()
         try:
-            answer = await self.ollama_client.generate(prompt=prompt)
+            generation = await self.ollama_client.generate(prompt=prompt)
         except OllamaClientError as exc:
             logger.error("Generation failed: {}", exc)
             raise
@@ -133,8 +161,11 @@ class GenerationService:
         total_latency_ms = (time.perf_counter() - total_start) * 1000
 
         logger.info(
-            "Generation completed | chunks={} | retrieval_latency_ms={:.2f} | generation_latency_ms={:.2f} | total_latency_ms={:.2f}",
+            "Generation completed | chunks={} | prompt_tokens={} | output_tokens={} | "
+            "retrieval_latency_ms={:.2f} | generation_latency_ms={:.2f} | total_latency_ms={:.2f}",
             len(context_chunks),
+            generation.prompt_eval_count,
+            generation.eval_count,
             retrieval_latency_ms,
             generation_latency_ms,
             total_latency_ms
@@ -142,12 +173,16 @@ class GenerationService:
 
         return GenerationResult(
             query=query,
-            answer=answer,
+            answer=generation.text,
             sources=build_sources_list(context_chunks),
             retrieval_latency_ms=round(retrieval_latency_ms, 2),
             generation_latency_ms=round(generation_latency_ms, 2),
             total_latency_ms=round(total_latency_ms, 2),
             chunks_used=len(context_chunks),
+            context_chunks=to_context_chunks(context_chunks),
+            prompt_eval_count=generation.prompt_eval_count,
+            eval_count=generation.eval_count,
+            ollama=generation,
         )
 
     async def health_check(self) -> Dict:

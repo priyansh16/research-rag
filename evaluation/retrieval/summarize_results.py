@@ -10,7 +10,6 @@ Usage (from the repo root):
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,13 +17,14 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from loguru import logger
 
+# run_label lives in evaluation/common.py (shared with the generation
+# tooling); imported here so `from summarize_results import run_label` works.
+from evaluation.common import run_label
+
 
 EVAL_DIR = Path(__file__).resolve().parent
 DEFAULT_RESULTS_DIR = EVAL_DIR / "results"
 DEFAULT_OUTPUT = EVAL_DIR / "results.md"
-
-# Matches the run.py output name: <YYYY-MM-DD>_<label>.json
-_FILENAME = re.compile(r"^\d{4}-\d{2}-\d{2}_(?P<label>.+)$")
 
 METRIC_COLUMNS = ["hit@1", "hit@3", "hit@5", "hit@10", "mrr@10", "doc_hit@3"]
 DOC_METRIC = "hit@3"
@@ -41,15 +41,6 @@ class Run:
     def timestamp(self) -> str:
         return self.meta["timestamp"]
 
-
-def run_label(path: Path) -> str:
-    """
-    Label from the filename, not meta: files get renamed after the fact
-    (e.g. a run saved as 'baseline' later kept as 'pre_label_fix'), and
-    the filename is what tells runs apart.
-    """
-    match = _FILENAME.match(path.stem)
-    return match.group("label") if match else path.stem
 
 
 def parse_run(path: Path) -> Run:

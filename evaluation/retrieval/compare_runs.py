@@ -18,12 +18,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from evaluation.common import resolve_run_path as resolve_results_path
 from evaluation.retrieval.metrics import hit_at_k
 from evaluation.retrieval.summarize_results import (
     DEFAULT_RESULTS_DIR,
     Run,
     parse_run,
-    run_label,
 )
 
 
@@ -65,17 +65,7 @@ class Comparison:
 # Loading
 def resolve_run_path(arg: str, results_dir: Path) -> Path:
     """Accept a file path, or a label matching results/<date>_<label>.json exactly."""
-    path = Path(arg)
-    if path.is_file():
-        return path
-
-    matches = sorted(p for p in results_dir.glob("*.json") if run_label(p) == arg)
-    if len(matches) == 1:
-        return matches[0]
-    if not matches:
-        raise FileNotFoundError(f"No results file or label '{arg}' in {results_dir}")
-    names = ", ".join(p.name for p in matches)
-    raise ValueError(f"Label '{arg}' matches several files ({names}); pass a file path instead")
+    return resolve_results_path(arg, results_dir, suffix=".json")
 
 
 def load_run(path: Path) -> Tuple[Run, Dict[str, Dict]]:

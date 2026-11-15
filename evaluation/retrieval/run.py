@@ -13,24 +13,31 @@ Usage (from the repo root):
 
 import argparse
 import json
-import re
-import subprocess
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
 from loguru import logger
 
 from src.core.config import settings
+# Shared helpers; also imported here so existing `from evaluation.retrieval.run import ...` keeps working.
+from evaluation.common import (  # noqa: F401
+    VALID_SUBTYPES,
+    VALID_TYPES,
+    git_revision,
+    load_questions,
+    output_path,
+    parse_label,
+    validate_question,
+)
 from evaluation.retrieval.metrics import (
     QuestionResult,
     RetrievedChunk,
     find_answer_chunks,
     group_by,
     is_relevant,
-    normalize_for_match,
     percentile,
     reachability,
     score_separation,
@@ -44,72 +51,8 @@ DEFAULT_QUESTIONS = EVAL_DIR / "questions.jsonl"
 DEFAULT_OUT_DIR = EVAL_DIR / "results"
 DEFAULT_KS = "1,3,5,10"
 
-VALID_TYPES = {"direct", "paraphrased", "unanswerable"}
-VALID_SUBTYPES = {"near_miss", "off_topic"}
 WARMUP_QUERY = "warm-up query to load the embedding model"
 EXCERPT_CHARS = 160
-
-
-# Questions file
-def validate_question(q: Dict) -> List[str]:
-    """Return a list of problems with one question row (empty if valid)."""
-    errors = []
-
-    for key in ("id", "type", "question"):
-        if not q.get(key):
-            errors.append(f"missing '{key}'")
-
-    q_type = q.get("type")
-    if q_type and q_type not in VALID_TYPES:
-        errors.append(f"unknown type '{q_type}' (expected one of {sorted(VALID_TYPES)})")
-
-    subtype = q.get("subtype")
-    if subtype is not None:
-        if q_type != "unanswerable":
-            errors.append("'subtype' is only for unanswerable questions")
-        elif subtype not in VALID_SUBTYPES:
-            errors.append(f"unknown subtype '{subtype}' (expected one of {sorted(VALID_SUBTYPES)})")
-
-    if q_type == "unanswerable":
-        if q.get("doc") is not None or q.get("must_contain") is not None:
-            errors.append("unanswerable questions must have doc and must_contain set to null")
-    elif q_type in VALID_TYPES:
-        if not q.get("doc"):
-            errors.append("answerable questions need a 'doc'")
-        must_contain = q.get("must_contain")
-        if not must_contain or not normalize_for_match(must_contain):
-            # An empty normalized string would match every chunk.
-            errors.append("answerable questions need a non-empty 'must_contain'")
-
-    return errors
-
-
-def load_questions(path: Path) -> List[Dict]:
-    """Load and validate questions.jsonl, raising ValueError listing every problem."""
-    questions, errors, seen_ids = [], [], set()
-
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            q = json.loads(line)
-        except json.JSONDecodeError as exc:
-            errors.append(f"line {lineno}: invalid JSON ({exc.msg})")
-            continue
-
-        label = f"line {lineno} ({q.get('id', '?')})"
-        errors.extend(f"{label}: {e}" for e in validate_question(q))
-
-        if q.get("id") in seen_ids:
-            errors.append(f"{label}: duplicate id")
-        seen_ids.add(q.get("id"))
-        questions.append(q)
-
-    if errors:
-        raise ValueError("Invalid questions file:\n  " + "\n  ".join(errors))
-    if not questions:
-        raise ValueError(f"No questions found in {path}")
-    return questions
 
 
 # CLI helpers
@@ -121,12 +64,6 @@ def parse_ks(value: str) -> List[int]:
     if not ks or ks[0] < 1:
         raise argparse.ArgumentTypeError("--ks values must be >= 1")
     return ks
-
-
-def parse_label(value: str) -> str:
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
-        raise argparse.ArgumentTypeError("--label may only contain letters, digits, '_' and '-'")
-    return value
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -153,21 +90,6 @@ def configure_logging(verbose: bool) -> None:
         level="INFO" if verbose else "WARNING",
         format="<level>{level:<8}</level> | {message}",
     )
-
-
-def git_revision() -> str:
-    try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, check=True, cwd=EVAL_DIR,
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True, text=True, check=True, cwd=EVAL_DIR,
-        ).stdout.strip()
-        return f"{commit}-dirty" if dirty else commit
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
 
 
 # Services
@@ -413,13 +335,6 @@ def print_report(report: Dict, results: List[QuestionResult], doc_k: int) -> Non
               f"answer_in={answer_in:<12} top={top_desc}")
     print()
 
-
-def output_path(out_dir: Path, label: str, overwrite: bool) -> Path:
-    path = out_dir / f"{date.today().isoformat()}_{label}.json"
-    # Zero-byte files are placeholders and safe to fill in.
-    if path.exists() and path.stat().st_size > 0 and not overwrite:
-        raise FileExistsError(f"{path} already exists; pass --overwrite or use a different --label")
-    return path
 
 
 def main(argv: Sequence[str] | None = None) -> int:

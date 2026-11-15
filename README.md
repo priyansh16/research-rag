@@ -142,15 +142,19 @@ Grounded Response
 - FastAPI dependency injection with application-scoped service
   lifecycle (one shared instance per service, built once at startup)
 - Retrieval evaluation harness: hit@k, MRR and answer reachability on a
-  96-question golden set, with run-to-run comparison per question
-- 105 automated tests covering ingestion, retrieval, reranking, prompt building,
+  96-question golden set, with run-to-run comparison per question; [Retrieval Evaluation](#retrieval-evaluation)
+- Generation evaluation: correctness, refusals, faithfulness (LLM judge) and
+  cost per question, through the app's own generation call; see
+  [Generation Evaluation](#generation-evaluation)
+- Reproducible generation: temperature 0, fixed seed, explicit context window,
+  one fixed refusal sentence
+- 167 automated tests covering ingestion, retrieval, reranking, prompt building,
   guardrails, generation, evaluation tooling, and real API/DI wiring
-  end-to-end, split into a fast per-commit app suite (45), evaluation
-  tooling tests (58, `eval` marker) and a scheduled Ollama-dependent
+  end-to-end, split into a fast per-commit app suite (54), evaluation
+  tooling tests (111, `eval` marker) and a scheduled Ollama-dependent
   `e2e` suite (2)
 
 ### In Progress
-- Retrieval experiments (chunk dedup, chunking, reranking); see [Retrieval Evaluation](#retrieval-evaluation)
 - LangChain integration for prompt management and 
   retrieval-augmented generation
 - Alembic migrations for schema versioning
@@ -159,7 +163,6 @@ Grounded Response
 
 ### Planned
 - Streaming response support
-- Generation quality evaluation (faithfulness, answer relevance) with RAGAS
 - Swap SQLite for PostgreSQL for production readiness
 
 ---
@@ -175,7 +178,7 @@ run directly against `RetrievalService` with no HTTP and no LLM.
 | E0 | Answer reachability | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
 | E1 | BGE query prefix | | | | | | | Not adopted, no effect (v1 set only) |
 | E3 | **Reranker: MiniLM-L-6, 15 candidates** | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted** (bge-reranker-base: 6 regressions, 3× slower) |
-| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current setup** |
+| E2 | **Reranker + neighbour dedup (window 1)** | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted. Current retrieval setup** |
 | E4 | Chunking: less overlap, split long elements (+ text-layer tables) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6; overlap was adding recall |
 
 Counts are out of 79 answerable questions. hit@3 is the headline metric (the app sends 3 chunks to the LLM).
@@ -193,6 +196,43 @@ uv run python -m evaluation.retrieval.compare_runs <label_a> <label_b>
 
 # Regenerate the results.md tables from all runs
 uv run python -m evaluation.retrieval.summarize_results
+```
+
+---
+
+## Generation Evaluation
+
+The same 96 questions run through the app's own `GenerationService.generate()` (guardrails → retrieval → prompt →
+local `llama3.2:3b`), the call the API makes. Answers are reproducible: temperature 0, fixed seed, explicit context
+window. An LLM judge (Claude Sonnet via `claude -p`) checks each answer twice:
+**correctness** against the paper's answer, and **faithfulness**: is every claim supported by the retrieved chunks?
+
+| # | Context chunks | Correct (of 79) | Unanswerable refused (of 17) | Faithfulness | Prompt tokens p50 | Latency p50 / p95 | Verdict |
+|---|---|---|---|---|---|---|---|
+| G0 | **k = 3** | **51** (+1 partial) | **17** | **0.914** | 1,178 | 2.9 s / 5.3 s | **Current generation setup** |
+| G1 | k = 5 | 55 (+3 partial) | 17 | 0.881 | 1,938 | 4.8 s / 10.0 s | Not adopted: +4 correct for +63% tokens, ~2× p95, less grounded |
+
+- With the right chunk in context, the model answers correctly 80% of the time (51/64), and it never answers
+  correctly without it. Of 28 misses, 15 are retrieval (right chunk not in the top 3) and 13 generation
+  (6 wrong answers, 7 refusals despite having the answer).
+- It refused all 17 unanswerable questions and never invented an answer to an off-topic one.
+- Made-up claims come almost entirely from misread OCR tables.
+- Judge hand check on 15 answers: agreed on claims 15/15, on correctness 14/15.
+- A strict string match on the labelled answer scored 42, not 51: it misses reformatted correct answers and can pass
+  wrong ones, so the judge is the headline.
+
+Hypotheses, metrics and decisions: [EXPERIMENTS.md](evaluation/generation/EXPERIMENTS.md).
+
+```bash
+# Generate answers (writes results/<date>_<label>.jsonl); experiments are env vars
+uv run python -m evaluation.generation.run --label <label>
+TOP_K_RESULTS=5 uv run python -m evaluation.generation.run --label <label>
+
+# Judge them with Claude via `claude -p` (resumable; --max-batches N for a cost check first)
+uv run python -m evaluation.generation.judge --label <label> --judge-model claude-sonnet-5-5
+
+# Compare two runs: improved / regressed questions plus a quality and cost table
+uv run python -m evaluation.generation.compare_runs <label_a> <label_b>
 ```
 
 ---

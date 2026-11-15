@@ -10,6 +10,31 @@ https://keepachangelog.com/en/1.1.0/
 ## [Unreleased]
 
 ### Added
+- Generation evaluation, phase 1 (`evaluation/generation/run.py`): runs every question through
+  `GenerationService.generate()` and writes one row per question to `results/<date>_<label>.jsonl` as it goes
+  (answer, full context chunks, token counts, run config). Deterministic metrics in `evaluation/generation/metrics.py`:
+  correctness (`must_contain` in the answer), refusals (`REFUSAL_MESSAGE`) by unanswerable subtype, false refusals,
+  soft-refusal wording listed for review, gold chunk in context, retrieval vs generation miss, prompt truncation.
+  Scoring v2: reworded refusals without a `[n]` citation also count as refusals (the exact-sentence count is kept as
+  prompt compliance); false refusals are split by whether the gold chunk was in the context. `--rescore <label>`
+  recomputes the scores of a saved run from its answers, without regenerating.
+- Generation evaluation, phase 2 (`evaluation/generation/judge.py`): Claude Sonnet via `claude -p` (Pro plan, no API
+  key) judges each non-refusal answer for faithfulness (claims supported by the context) and correctness
+  (correct / partial / incorrect against the reference excerpt), 6 answers per call with a JSON schema. Appends to
+  `results/<date>_<label>.judged.jsonl` batch by batch and resumes after interruptions; retries a failed batch once;
+  stops if the resolved judge model changes; logs token usage per call. `--max-batches` for a cost check,
+  `--sample N` writes a hand-check sheet, `--agreement` counts the ticked boxes.
+- `evaluation/generation/compare_runs.py`: question-by-question comparison of two generation runs. Outcomes come from
+  the judge when both runs are fully judged, otherwise both use the strict match. Lists Improved / Regressed /
+  Changed-without-score-change (e.g. honest refusal → wrong answer) with gold rank and faithfulness, plus a side-by-side
+  table of quality and cost (prompt tokens, latency, correct answers per 1k prompt tokens). Refuses to compare runs
+  with different questions, scoring versions or judge model/prompt.
+- `evaluation/generation/EXPERIMENTS.md`: G0 (k=3: 51/79 judged correct, 17/17 unanswerable refused, faithfulness
+  0.914) and G1 (k=5: not adopted; +4 correct for +63% prompt tokens and ~2× p95 latency, faithfulness 0.881).
+  `TOP_K_RESULTS` stays 3. Judge hand check: claims 15/15, correctness 14/15. README results table and DEVLOG
+  "Generation Evaluation" section.
+- `evaluation/common.py`: helpers shared by the retrieval and generation tooling (`normalize_for_match`, question
+  loading, labels, results-file lookup by suffix, git revision). The retrieval modules import from it.
 - Retrieval evaluation harness (`evaluation/retrieval/run.py`): 96-question golden set over 5 papers
   (79 answerable, labelled by type direct / paraphrased and answer location body / table / figure;
   17 unanswerable, tagged `near_miss` / `off_topic`), run directly against `RetrievalService`;
@@ -42,6 +67,16 @@ https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Generation is now reproducible: `GENERATION_TEMPERATURE` default 0.1 → 0, and every Ollama call sends a fixed
+  `GENERATION_SEED` (default 42) and an explicit `OLLAMA_NUM_CTX` (default 8192). Before, `num_ctx` was left to
+  Ollama's server default, which truncates longer prompts without an error. Update `.env` if it sets
+  `GENERATION_TEMPERATURE`.
+- The model declines with one fixed sentence (`REFUSAL_MESSAGE` in `prompt_builder.py`) when the context doesn't
+  contain the answer, instead of free wording. The no-chunks response uses the same sentence (was "I couldn't find
+  any relevant information…").
+- `OllamaClient.generate` returns an `OllamaGeneration` (text, `prompt_eval_count`, `eval_count`, durations,
+  `done_reason`) instead of a string, and logs the token counts. `GenerationResult` also carries the full-text
+  context chunks and token counts; the public API response is unchanged.
 - Retrieval now reranks by default: the app downloads the MiniLM cross-encoder (~90 MB) on first start, and the
   returned `score` is a cross-encoder logit (unbounded), not cosine similarity. Set `RETRIEVAL_RERANKER_MODEL=""` for
   vector-only retrieval.
