@@ -394,6 +394,47 @@ research-rag/
 
 ## Setup and Running
 
+### With Docker Compose (from a fresh clone)
+
+Needs Docker with Compose v2.24 or newer. Give Docker at least 8 GB of memory: the API (embedding model,
+reranker, PDF layout model) and the 3B generation model share it.
+
+```bash
+git clone <repo-url> && cd research-rag
+
+# API + Ollama in containers; pulls llama3.2:3b on the first start
+docker compose up --build
+```
+
+On a Mac, Ollama inside Docker runs on the CPU only (Docker can't use the Apple GPU), so answers take much longer.
+To use the Ollama app on the host instead (it uses the GPU):
+
+```bash
+ollama pull llama3.2:3b     # once, on the host
+docker compose -f compose.yaml -f compose.host-ollama.yaml up --build
+```
+
+The API is at http://localhost:8000 (interactive docs at http://localhost:8000/docs).
+The first start downloads the embedding model and the reranker; the first PDF upload downloads the layout model.
+They are cached in a Docker volume, so later starts are fast.
+
+```bash
+# Check that every component is up (Chroma, embedding model, Ollama + model)
+curl http://localhost:8000/api/v1/health/full
+
+# Upload a PDF, then ask a question
+curl -F "file=@paper.pdf" http://localhost:8000/api/v1/documents/upload
+curl -X POST http://localhost:8000/api/v1/generation/query \
+     -H "Content-Type: application/json" -d '{"query": "What dataset did the authors use?"}'
+
+docker compose down       # stop; documents and models stay in the volumes
+docker compose down -v    # stop and delete all data and downloaded models
+```
+
+The document store starts empty in Docker volumes.
+
+### Locally with uv
+
 This project uses [uv](https://github.com/astral-sh/uv) for dependency 
 management.
 

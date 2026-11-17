@@ -386,3 +386,22 @@ Hypotheses, results and decisions per run are in
   - The bigger lever is the refusal instruction (7 refusals with the answer at rank 1), not k.
 - Found while hand-checking: duplicate paragraphs in non-adjacent chunks (MLSA23-RASMAS #27/#29) waste context slots
   and position-based dedup can't catch them; one ambiguous question (bic_q12). Both on the backlog.
+
+---
+
+## Docker Compose (2026-11-17)
+
+- `docker compose up` runs the API and Ollama from a fresh clone (the model is pulled by a one-shot service);
+  `compose.host-ollama.yaml` uses the host's Ollama instead, because Ollama in Docker on a Mac can't use the GPU.
+- Bug found on the first upload: `unstructured` installs its spaCy model into site-packages **at runtime** on first
+  use. In the container site-packages belongs to root and the app runs as a non-root user, so the install failed,
+  and `partition_pdf` only logged "PDF text extraction failed" before OCR-ing every page. Result: 74 chunks instead
+  of 68, OCR errors ("logiq3" → "logiq?"), a different index from the one evaluated. Fixed by pre-installing the
+  model at build time with the version and hash `unstructured` pins; the build now fails if the model can't load.
+- Learnings:
+  - It worked locally only because the local venv is writable: a hidden runtime install that isn't in `uv.lock`.
+    Grep startup and first-use logs for "Downloading" in a new environment.
+  - Compare a container's output with the evaluated system (chunk count, a known excerpt), not just "did it answer".
+    The OCR'd index still answered the smoke-test question correctly.
+  - Retrieval is ~3× slower in the container (~0.8 s vs ~0.23 s): the embedding model and reranker run on the Linux
+    CPU instead of natively.

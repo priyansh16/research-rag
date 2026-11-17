@@ -10,6 +10,14 @@ https://keepachangelog.com/en/1.1.0/
 ## [Unreleased]
 
 ### Added
+- Docker: `Dockerfile` (python 3.11-slim, uv 0.11.14, system libraries for unstructured hi_res parsing, non-root
+  user, liveness healthcheck) and `compose.yaml` that brings up the API and Ollama from a fresh clone, pulling the
+  generation model on first start. `compose.host-ollama.yaml` points the API at the host's Ollama instead (on a Mac,
+  Ollama in Docker is CPU-only). Data, uploads and downloaded models live in named volumes; the local `chroma_db/`
+  and `rag.db` aren't used. `make docker-up` / `docker-up-host` / `docker-down`.
+  The spaCy model `en_core_web_sm` 3.8.0 is pre-installed at build time (pinned hash): `unstructured` otherwise
+  installs it into site-packages on first use, which fails for the non-root user and makes PDF parsing silently skip
+  the text layer and OCR every page.
 - Generation evaluation, phase 1 (`evaluation/generation/run.py`): runs every question through
   `GenerationService.generate()` and writes one row per question to `results/<date>_<label>.jsonl` as it goes
   (answer, full context chunks, token counts, run config). Deterministic metrics in `evaluation/generation/metrics.py`:
