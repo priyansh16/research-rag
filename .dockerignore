@@ -1,0 +1,21 @@
+# Keep the build context small and free of local state and secrets.
+.git
+.venv
+.env
+.env.*
+.pytest_cache
+**/__pycache__
+.DS_Store
+
+# Local data: the container uses its own volumes.
+chroma_db*
+*.db
+data
+logs
+
+# Not needed to run the API.
+evaluation
+tests
+plan.md
+notes.md
+*.md

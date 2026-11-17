@@ -1,0 +1,21 @@
+# Override: use the Ollama running on the host (e.g. the Mac app, which uses the
+# GPU) instead of the bundled Ollama container.
+#
+#   ollama pull llama3.2:3b          # once, on the host
+#   docker compose -f compose.yaml -f compose.host-ollama.yaml up --build
+
+services:
+  # Disabled: only start when this profile is explicitly requested.
+  ollama:
+    profiles: ["bundled-ollama"]
+  ollama-pull:
+    profiles: ["bundled-ollama"]
+
+  api:
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_TIMEOUT_SECONDS: "60"
+    # Docker Desktop provides host.docker.internal; this line makes it work on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: !reset []

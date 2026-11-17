@@ -4,7 +4,7 @@
 
 | # | Run | Correct | Partial | Incorrect | Refused (answerable) | Unanswerable refused | Faithfulness | Prompt tokens p50 / p95 | Latency p50 / p95 | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| G0 | **k=3** (`gen_k3`) | **51** | 1 | 10 | 17 (7 with gold in context) | **17/17** | **0.914** | 1,178 / 2,343 | 2.9 s / 5.3 s | **Default, kept** |
+| G0 | **k=3** (`gen_k3`) | **51** | 1 | 10 | 17 (7 with gold in context) | **17/17** | **0.914** | 1,178 / 2,343 | 2.9 s / 5.3 s | **Kept, default** |
 | G1 | k=5 (`gen_k5`) | 55 | 3 | 13 | 8 (3 with gold in context) | 17/17 | 0.881 | 1,938 / 3,532 | 4.8 s / 10.0 s | Not adopted: +4 correct for +63% tokens, ~2× p95 latency, lower faithfulness |
 
 Correct / partial / incorrect are the judge's verdicts on the 79 answerable questions (strict `must_contain` match:
