@@ -4,14 +4,14 @@
 
 | # | Experiment | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 | p50 ms | Verdict |
 |---|---|---|---|---|---|---|---|---|
-| — | [Baseline v2](#baseline-v2) (no reranker) | 37 | **52** | 59 | 66 | 0.583 | 21 | Reference for E2, E3 |
+| — | [Baseline v2](#baseline-v2): vector search only (`baseline_v2`) | 37 | **52** | 59 | 66 | 0.583 | 21 | Reference for E2, E3 |
 | E0 | [Answer reachability](#e0-answer-reachability) | — | — | — | — | — | — | Diagnostic: 78/79 answers reachable |
 | E2 | [Neighbour dedup](#e2-neighbour-dedup) w1 | 37 | **54** | 62 | 68 | 0.597 | — | +2 at k=3 (3 up, 1 down) |
 | E2 | Neighbour dedup w2 | 37 | **53** | 61 | 66 | 0.589 | — | Not adopted: 3 regressions |
-| E3 | [Reranker](#e3-cross-encoder-reranker) bge-reranker-base, 20 cand. | 50 | **60** | 65 | 68 | 0.715 | 941 | Not adopted: 6 regressions, 3× slower |
-| E3 | Reranker MiniLM-L-6, 20 cand. | 55 | **61** | 65 | 71 | 0.755 | 301 | +9 at k=3, 0 regressions |
-| E3 | Reranker MiniLM-L-6, 30 cand. | 56 | **62** | 65 | 71 | 0.763 | 434 | Same quality, too slow |
-| E3 | **Reranker MiniLM-L-6, 15 cand.** (`rerank_minilm_c15`) | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted, default** |
+| E3 | [Reranker](#e3-cross-encoder-reranker) bge-reranker-base (278M), 20 cand. (`rerank_bge_base`) | 50 | **60** | 65 | 68 | 0.715 | 941 | Not adopted: 6 regressions; 3× slower than MiniLM at the same 20 cand. (941 vs 301 ms) |
+| E3 | Reranker MiniLM-L-6 (22M), 20 cand. (`rerank_minilm`) | 55 | **61** | 65 | 71 | 0.755 | 301 | +9 at k=3, 0 regressions |
+| E3 | Reranker MiniLM-L-6 (22M), 30 cand. (`rerank_minilm_c30`) | 56 | **62** | 65 | 71 | 0.763 | 434 | Same quality, too slow |
+| E3 | **Reranker MiniLM-L-6 (22M), 15 cand.** (`rerank_minilm_c15`) | 55 | **62** | 66 | 70 | 0.756 | 231 | **Adopted**: +10 vs baseline; smaller and faster than bge |
 | E2+E3 | **Reranker c15 + neighbour dedup w1** (`rerank_c15_neighbor_w1`) | 55 | **64** | 67 | 69 | 0.760 | 228 | **Adopted, default. Final reference** |
 | E4a | [Chunking: overlap cap + split long elements](#e4-chunking-overlap-fix) (`e4_rerank`) | 51 | **56** | 60 | 65 | 0.696 | 246 | Not adopted: −6 vs c15 (2 up, 8 down) |
 | E4b | E4a + text-layer tables (`e4t_rerank`) | 50 | **56** | 59 | 65 | 0.686 | 254 | Not adopted: ±0 vs E4a (3 up, 3 down) |
@@ -29,7 +29,7 @@ hit@3 is the headline metric because the app sends 3 chunks to the LLM; this may
 | — | Baseline (`baseline_reach`) | 19 | **30** | 35 | 0.576 | Reference |
 | E0 | Answer reachability | — | — | — | — | Diagnostic: 43/44 answers reachable |
 | E1 | [BGE query prefix](#e1-bge-query-prefix) | 18 | **31** | 33 | 0.561 | Not adopted, no effect |
-| E2 | Neighbour dedup (window 1) | 19 | **30** | 37 | 0.592 | Tie at k=3, +2 at k=5 (superseded by v2 re-run) |
+| E2 | Neighbour dedup w1 | 19 | **30** | 37 | 0.592 | Tie at k=3, +2 at k=5 (superseded by v2 re-run) |
 
 v1 and v2 numbers are not comparable with each other. E1 was not re-run on v2 (old branch layout, no effect on v1).
 
