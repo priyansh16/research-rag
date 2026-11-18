@@ -9,6 +9,14 @@ https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+---
+
+## [0.4.0] - 2026-11-17
+
+Evaluation and Docker release: retrieval and generation measured on a 96-question hand-labelled set
+(right passage in the top 3 for 52 → 64 of 79; 51/79 correct answers; 17/17 unanswerable questions refused),
+a cross-encoder reranker, reproducible generation, and `docker compose up` from a fresh clone.
+
 ### Added
 - Docker: `Dockerfile` (python 3.11-slim, uv 0.11.14, system libraries for unstructured hi_res parsing, non-root
   user, liveness healthcheck) and `compose.yaml` that brings up the API and Ollama from a fresh clone, pulling the
